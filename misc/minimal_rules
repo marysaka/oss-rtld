@@ -1,0 +1,11 @@
+include $(DEVKITPRO)/devkitA64/base_rules
+
+%.nso: %.elf
+	@elf2nso $< $@
+	@echo built ... $(notdir $@)
+
+#---------------------------------------------------------------------------------
+%.elf:
+	@echo linking $(notdir $@)
+	@$(LD) $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
+	@$(NM) -CSn $@ > $(notdir $*.lst)
