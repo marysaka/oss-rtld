@@ -100,3 +100,4 @@ extern module_object_list_t g_pManualLoadList;
 extern module_object_list_t g_pAutoLoadList;
 extern bool g_RoDebugFlag;
 extern lookup_global_t g_LookupGlobalManualFunctionPointer;
+extern bool g_IsExceptionHandlerReady;

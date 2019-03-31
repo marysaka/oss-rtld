@@ -204,12 +204,6 @@ static inline void resolve_symbol_rela_jump_slot(module_object_t *module_object,
     }
 }
 
-extern "C" void unknown_func(void) {
-    // FIXME: this set a unused flag
-    debug_print("unknown_func\n");
-    // svcBreak(0, 0, 0);
-}
-
 extern "C" void __rtld_runtime_resolve(void);
 
 extern "C" Elf64_Addr rtld_lazy_bind_symbol(module_object_t *module,

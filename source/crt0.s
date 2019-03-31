@@ -1,14 +1,15 @@
 .global __module_start
 .global __rtld_runtime_resolve
+
 .extern handle_exception
 .extern relocate_self
 
-.extern unknown_func
+.extern set_exception_handler_ready
 .extern modules_constructor_init
 .extern rtld_lazy_bind_symbol
+.extern g_IsExceptionHandlerReady
 
 
-.weak   _ZN2nn4init5StartEmmPFvvES2_
 .global _ZN2nn4init5StartEmmPFvvES2_
 
 .macro FUNC_RELATIVE_ASLR name, register_num, symbol
@@ -51,15 +52,21 @@ FUNC_RELATIVE_ASLR __start, 1, _DYNAMIC
     add x1, x1, #:lo12:__argdata__
     bl general_init_shim
 
-FUNC_RELATIVE_ASLR general_init_shim, 2, unknown_func
+FUNC_RELATIVE_ASLR general_init_shim, 2, set_exception_handler_ready
     bl general_init
 FUNC_RELATIVE_ASLR general_init, 3, modules_constructor_init
     bl _ZN2nn4init5StartEmmPFvvES2_
-hang:
-    b hang
+    b .
 
 __entry_exception_shim:
-    b handle_exception
+    b handle_exception_shim
+FUNC_RELATIVE_ASLR handle_exception_shim 2 g_IsExceptionHandlerReady
+    cbz w2, unhandled_exception
+    bl handle_exception
+unhandled_exception:
+    mov w0, 0xf801
+    bl svcReturnFromException
+    b .
 
 .section ".text", "ax"
 

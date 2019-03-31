@@ -12,7 +12,7 @@ BUILD		:=	build
 SOURCES		:=	source
 INCLUDES	:=	include
 
-ARCH	:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -ftls-model=local-exec
+ARCH	:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIC -fvisibility=hidden
 
 CFLAGS	:=	-Wall -Wextra -O2 -ffunction-sections -fdata-sections \
 			$(ARCH) $(DEFINES)
@@ -22,8 +22,7 @@ CFLAGS	+= $(INCLUDE) -D__SWITCH__
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables
 
 ASFLAGS	:=	$(ARCH)
-LDFLAGS	= -nostartfiles -lgcc -specs=$(TOPDIR)/misc/rtld.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)  -Wl,--dynamic-list=$(TOPDIR)/exported.txt -Wl,-init=__rtld_init -Wl,-fini=__rtld_fini
-
+LDFLAGS	= -nostartfiles -lgcc -specs=$(TOPDIR)/misc/rtld.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 LIBS :=
 LIBDIRS :=
 
