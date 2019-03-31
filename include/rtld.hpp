@@ -79,6 +79,8 @@ Result svcQueryMemory(memory_info_t *memory_info_ptr, uint32_t *pageinfo,
 Result svcBreak(uint32_t breakReason, uint64_t unk, uint64_t info);
 void svcReturnFromException(Result errorCode);
 Result svcOutputDebugString(const char *str, size_t str_size);
+
+void svcExitProcess(void);
 }
 
 inline void debug_print(const char *str) {

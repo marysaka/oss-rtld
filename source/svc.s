@@ -22,6 +22,11 @@ SVC_BEGIN svcQueryMemory
     ret
 SVC_END
 
+SVC_BEGIN svcExitProcess
+    svc 0x7
+    ret
+SVC_END
+
 SVC_BEGIN svcBreak
     svc 0x26
     ret

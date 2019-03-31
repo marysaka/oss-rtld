@@ -206,7 +206,7 @@ static inline void resolve_symbol_rela_jump_slot(module_object_t *module_object,
 
 extern "C" void __rtld_runtime_resolve(void);
 
-extern "C" Elf64_Addr rtld_lazy_bind_symbol(module_object_t *module,
+extern "C" Elf64_Addr __rtld_lazy_bind_symbol(module_object_t *module,
                                             uint64_t index) {
     if (module->is_rela) {
         Elf64_Rela *entry = &module->rela_or_rel_plt.rela[index];
@@ -239,7 +239,7 @@ extern "C" Elf64_Addr rtld_lazy_bind_symbol(module_object_t *module,
     return 0;
 }
 
-extern "C" void modules_constructor_init(void) {
+extern "C" void __rtld_modules_init(void) {
     for (module_object_t *module = g_pAutoLoadList.front;
          module != (module_object_t *)&g_pAutoLoadList; module = module->next) {
         module->dt_init();
