@@ -1,4 +1,5 @@
 #include "rtld.hpp"
+#include "sdk_init.hpp"
 
 namespace nn {
 namespace os {
@@ -9,7 +10,13 @@ void WEAK UserExceptionHandler(void);
 }  // namespace os
 }  // namespace nn
 
-extern "C" void handle_exception() {
+bool g_IsExceptionHandlerReady;
+
+extern "C" void __rtld_notify_exception_handler_ready(void) {
+    g_IsExceptionHandlerReady = true;
+}
+
+extern "C" void __rtld_handle_exception() {
     // TODO: manage it correctly when everything has been relocated
     if (!nn::os::detail::UserExceptionHandler) {
         svcReturnFromException(0xF801);

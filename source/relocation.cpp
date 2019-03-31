@@ -280,7 +280,8 @@ void relocate_module(module_object_t *module_object) {
     }
 }
 
-extern "C" void relocate_modules(uint64_t aslr_base, Elf64_Dyn *dynamic) {
+extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
+                                        Elf64_Dyn *dynamic) {
     relocate_self(aslr_base, dynamic);
 
     // Init global lists
