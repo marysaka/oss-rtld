@@ -98,6 +98,13 @@ inline void relocate_self(uint64_t alsr_base, Elf64_Dyn *dynamic) {
 
 void initialize_module(module_object_t *module_object, uint64_t aslr_base,
                        Elf64_Dyn *dynamic) {
+#ifdef __RTLD_6XX__
+    module_object->nro_size = 0;
+    module_object->soname_idx = 0;
+    module_object->cannot_revert_symbols = false;
+#endif
+
+    module_object->is_rela = false;
     module_object->module_base = aslr_base;
     module_object->dyanmic = dynamic;
     module_object->rela_or_rel_plt_size = 0;
@@ -236,8 +243,13 @@ void initialize_module(module_object_t *module_object, uint64_t aslr_base,
                 module_object->rel_count = dynamic->d_un.d_val;
                 break;
 
-            case DT_NEEDED:
             case DT_SONAME:
+#ifdef __RTLD_6XX__
+                module_object->soname_idx = dynamic->d_un.d_val;
+#endif
+                break;
+
+            case DT_NEEDED:
             case DT_RPATH:
             case DT_SYMBOLIC:
             case DT_DEBUG:

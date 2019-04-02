@@ -38,7 +38,17 @@ struct module_object_t {
     uint64_t hash_nchain_value;
     uint64_t hash_nbucket_value;
     uint64_t got_stub_ptr;
+#ifdef __RTLD_6XX__
+    uint64_t soname_idx;
+    uint64_t nro_size;
+    bool cannot_revert_symbols;
+#endif
 };
 
+#ifdef __RTLD_6XX__
+static_assert(sizeof(module_object_t) == 0xD0,
+              "module_object_t size isn't valid");
+#else
 static_assert(sizeof(module_object_t) == 0xB8,
               "module_object_t size isn't valid");
+#endif

@@ -8,7 +8,6 @@ extern "C" void __rtld_notify_exception_handler_ready(void) {
 }
 
 extern "C" void __rtld_handle_exception() {
-    // TODO: manage it correctly when everything has been relocated
     if (!nn::os::detail::UserExceptionHandler) {
         svcReturnFromException(0xF801);
         while (true) {
