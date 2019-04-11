@@ -6,10 +6,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// TODO: switch to a C++ class.
-struct module_object_t {
-    struct module_object_t *next;
-    struct module_object_t *prev;
+namespace rtld {
+struct ModuleObject {
+    struct ModuleObject *next;
+    struct ModuleObject *prev;
     union {
         Elf64_Rel *rel;
         Elf64_Rela *rela;
@@ -43,12 +43,16 @@ struct module_object_t {
     uint64_t nro_size;
     bool cannot_revert_symbols;
 #endif
+
+    void Initialize(uint64_t aslr_base, Elf64_Dyn *dynamic);
+    void Relocate();
+    Elf64_Sym *GetSymbolByName(const char *name);
+    bool TryResolveSymbol(Elf64_Addr *target_symbol_address, Elf64_Sym *symbol);
 };
 
 #ifdef __RTLD_6XX__
-static_assert(sizeof(module_object_t) == 0xD0,
-              "module_object_t size isn't valid");
+static_assert(sizeof(ModuleObject) == 0xD0, "ModuleObject size isn't valid");
 #else
-static_assert(sizeof(module_object_t) == 0xB8,
-              "module_object_t size isn't valid");
+static_assert(sizeof(ModuleObject) == 0xB8, "ModuleObject size isn't valid");
 #endif
+}  // namespace rtld

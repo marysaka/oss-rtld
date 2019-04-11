@@ -21,7 +21,7 @@ typedef struct {
     uint32_t padding;
 } memory_info_t;
 
-static_assert(sizeof(memory_info_t) == 0x28, "memory_info_t size isn't valid");
+_Static_assert(sizeof(memory_info_t) == 0x28, "memory_info_t size isn't valid");
 
 Result svcQueryMemory(memory_info_t *memory_info_ptr, uint32_t *pageinfo,
                       uint64_t addr);
