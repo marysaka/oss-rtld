@@ -1,8 +1,8 @@
 #include "rtld.hpp"
 
 __attribute__((section(".bss"))) ModuleObject __nx_module_runtime;
-module_object_list_t g_pManualLoadList;
-module_object_list_t g_pAutoLoadList;
+ModuleObjectList g_pManualLoadList;
+ModuleObjectList g_pAutoLoadList;
 bool g_RoDebugFlag;
 lookup_global_t g_LookupGlobalManualFunctionPointer;
 
@@ -180,23 +180,20 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
         return;
     }
 
-    for (ModuleObject *module = g_pAutoLoadList.back;
-         module != (ModuleObject *)&g_pAutoLoadList; module = module->prev) {
+    for (ModuleObject *module : g_pAutoLoadList) {
         Elf64_Sym *symbol =
             module->GetSymbolByName("_ZN2nn2ro6detail15g_pAutoLoadListE");
         if (symbol && ELF64_ST_BIND(symbol->st_info)) {
-            module_object_list_t **symbol_val =
-                (module_object_list_t **)(module->module_base +
-                                          symbol->st_value);
+            ModuleObjectList **symbol_val =
+                (ModuleObjectList **)(module->module_base + symbol->st_value);
             *symbol_val = &g_pAutoLoadList;
         }
 
         symbol =
             module->GetSymbolByName("_ZN2nn2ro6detail17g_pManualLoadListE");
         if (symbol && ELF64_ST_BIND(symbol->st_info)) {
-            module_object_list_t **symbol_val =
-                (module_object_list_t **)(module->module_base +
-                                          symbol->st_value);
+            ModuleObjectList **symbol_val =
+                (ModuleObjectList **)(module->module_base + symbol->st_value);
             *symbol_val = &g_pManualLoadList;
         }
 
@@ -224,8 +221,7 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
         }
     }
 
-    for (ModuleObject *module = g_pAutoLoadList.back;
-         module != (ModuleObject *)&g_pAutoLoadList; module = module->prev) {
+    for (ModuleObject *module : g_pAutoLoadList) {
         module->ResolveSymbols(true);
     }
 }

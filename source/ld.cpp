@@ -1,12 +1,13 @@
 #include "rtld.hpp"
 
+#include <algorithm>
+
 Elf64_Addr lookup_global_auto(const char *name) {
     if (g_pAutoLoadList.back == (ModuleObject *)&g_pAutoLoadList) {
         return 0;
     }
 
-    for (ModuleObject *module = g_pAutoLoadList.back;
-         module != (ModuleObject *)&g_pAutoLoadList; module = module->prev) {
+    for (ModuleObject *module : g_pAutoLoadList) {
         Elf64_Sym *symbol = module->GetSymbolByName(name);
         if (symbol && ELF64_ST_BIND(symbol->st_info)) {
             return module->module_base + symbol->st_value;
@@ -49,8 +50,6 @@ extern "C" Elf64_Addr __rtld_lazy_bind_symbol(ModuleObject *module,
 }
 
 extern "C" void __rtld_modules_init(void) {
-    for (ModuleObject *module = g_pAutoLoadList.front;
-         module != (ModuleObject *)&g_pAutoLoadList; module = module->next) {
-        module->dt_init();
-    }
+    std::for_each(g_pAutoLoadList.rbegin(), g_pAutoLoadList.rend(),
+                  [](ModuleObject *module) { module->dt_init(); });
 }
