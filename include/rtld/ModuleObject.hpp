@@ -30,7 +30,7 @@ struct ModuleObject {
         Elf64_Rela *rela;
     } rela_or_rel;
     uint64_t module_base;
-    Elf64_Dyn *dyanmic;
+    Elf64_Dyn *dynamic;
     bool is_rela;
     uint64_t rela_or_rel_plt_size;
     void (*dt_init)(void);

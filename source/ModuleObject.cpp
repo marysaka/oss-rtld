@@ -11,7 +11,7 @@ void ModuleObject::Initialize(uint64_t aslr_base, Elf64_Dyn *dynamic) {
 
     this->is_rela = false;
     this->module_base = aslr_base;
-    this->dyanmic = dynamic;
+    this->dynamic = dynamic;
     this->rela_or_rel_plt_size = 0;
     this->dt_init = nullptr;
     this->dt_fini = nullptr;
