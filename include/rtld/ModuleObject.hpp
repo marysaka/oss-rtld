@@ -8,6 +8,16 @@
 
 namespace rtld {
 struct ModuleObject {
+   private:
+    // ResolveSymbols internals
+    inline void ResolveSymbolRelAbsolute(Elf64_Rel *entry);
+    inline void ResolveSymbolRelaAbsolute(Elf64_Rela *entry);
+    inline void ResolveSymbolRelJumpSlot(Elf64_Rel *entry,
+                                         bool do_lazy_got_init);
+    inline void ResolveSymbolRelaJumpSlot(Elf64_Rela *entry,
+                                          bool do_lazy_got_init);
+
+   public:
     struct ModuleObject *next;
     struct ModuleObject *prev;
     union {
@@ -47,6 +57,7 @@ struct ModuleObject {
     void Initialize(uint64_t aslr_base, Elf64_Dyn *dynamic);
     void Relocate();
     Elf64_Sym *GetSymbolByName(const char *name);
+    void ResolveSymbols(bool do_lazy_got_init);
     bool TryResolveSymbol(Elf64_Addr *target_symbol_address, Elf64_Sym *symbol);
 };
 

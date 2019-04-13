@@ -226,6 +226,6 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
 
     for (ModuleObject *module = g_pAutoLoadList.back;
          module != (ModuleObject *)&g_pAutoLoadList; module = module->prev) {
-        resolve_symbols(module, true);
+        module->ResolveSymbols(true);
     }
 }

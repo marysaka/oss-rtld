@@ -238,4 +238,153 @@ bool ModuleObject::TryResolveSymbol(Elf64_Addr *target_symbol_address,
     }
     return false;
 }
+
+void ModuleObject::ResolveSymbolRelAbsolute(Elf64_Rel *entry) {
+    uint32_t r_type = ELF64_R_TYPE(entry->r_info);
+    uint32_t r_sym = ELF64_R_SYM(entry->r_info);
+
+    if (r_type == R_AARCH64_ABS32 || r_type == R_AARCH64_ABS64 ||
+        r_type == R_AARCH64_GLOB_DAT) {
+        Elf64_Sym *symbol = &this->dynsym[r_sym];
+        Elf64_Addr target_symbol_address;
+
+        if (this->TryResolveSymbol(&target_symbol_address, symbol)) {
+            uint64_t *target =
+                (uint64_t *)(this->module_base + entry->r_offset);
+            *target += target_symbol_address;
+        } else if (g_RoDebugFlag) {
+            print_unresolved_symbol(&this->dynstr[symbol->st_name]);
+        }
+    }
+}
+
+void ModuleObject::ResolveSymbolRelaAbsolute(Elf64_Rela *entry) {
+    uint32_t r_type = ELF64_R_TYPE(entry->r_info);
+    uint32_t r_sym = ELF64_R_SYM(entry->r_info);
+
+    if (r_type == R_AARCH64_ABS32 || r_type == R_AARCH64_ABS64 ||
+        r_type == R_AARCH64_GLOB_DAT) {
+        Elf64_Sym *symbol = &this->dynsym[r_sym];
+        Elf64_Addr target_symbol_address;
+
+        if (this->TryResolveSymbol(&target_symbol_address, symbol)) {
+            uint64_t *target =
+                (uint64_t *)(this->module_base + entry->r_offset);
+            *target = target_symbol_address + entry->r_addend;
+        } else if (g_RoDebugFlag) {
+            print_unresolved_symbol(&this->dynstr[symbol->st_name]);
+        }
+    }
+}
+
+void ModuleObject::ResolveSymbolRelJumpSlot(Elf64_Rel *entry,
+                                            bool do_lazy_got_init) {
+    uint32_t r_type = ELF64_R_TYPE(entry->r_info);
+    uint32_t r_sym = ELF64_R_SYM(entry->r_info);
+
+    if (r_type == R_AARCH64_JUMP_SLOT) {
+        uint64_t *target = (uint64_t *)(this->module_base + entry->r_offset);
+        uint64_t target_address = this->module_base + *target;
+        if (do_lazy_got_init) {
+            *target = target_address;
+        }
+
+        if (this->got_stub_ptr) {
+            if (this->got_stub_ptr != target_address) {
+                svcBreak(0, 0, 0);
+            }
+        } else {
+            this->got_stub_ptr = target_address;
+        }
+
+        // We are in the non lazy case
+        if (!do_lazy_got_init) {
+            Elf64_Sym *symbol = &this->dynsym[r_sym];
+            Elf64_Addr target_symbol_address;
+
+            if (this->TryResolveSymbol(&target_symbol_address, symbol)) {
+                *target += target_symbol_address;
+            } else {
+                if (g_RoDebugFlag) {
+                    print_unresolved_symbol(&this->dynstr[symbol->st_name]);
+                }
+                *target = target_address;
+            }
+        }
+    }
+}
+
+void ModuleObject::ResolveSymbolRelaJumpSlot(Elf64_Rela *entry,
+                                             bool do_lazy_got_init) {
+    uint32_t r_type = ELF64_R_TYPE(entry->r_info);
+    uint32_t r_sym = ELF64_R_SYM(entry->r_info);
+
+    if (r_type == R_AARCH64_JUMP_SLOT) {
+        uint64_t *target = (uint64_t *)(this->module_base + entry->r_offset);
+        uint64_t target_address = this->module_base + *target;
+        if (do_lazy_got_init) {
+            *target = target_address;
+        }
+
+        if (this->got_stub_ptr) {
+            if (this->got_stub_ptr != target_address) {
+                svcBreak(0, 0, 0);
+            }
+        } else {
+            this->got_stub_ptr = target_address;
+        }
+
+        // We are in the non lazy case
+        if (!do_lazy_got_init) {
+            Elf64_Sym *symbol = &this->dynsym[r_sym];
+            Elf64_Addr target_symbol_address;
+
+            if (this->TryResolveSymbol(&target_symbol_address, symbol)) {
+                *target = target_symbol_address + entry->r_addend;
+            } else {
+                if (g_RoDebugFlag) {
+                    print_unresolved_symbol(&this->dynstr[symbol->st_name]);
+                }
+                *target = target_address;
+            }
+        }
+    }
+}
+
+void ModuleObject::ResolveSymbols(bool do_lazy_got_init) {
+    for (uint64_t index = this->rel_count;
+         index < this->rel_dyn_size / sizeof(Elf64_Rel); index++) {
+        Elf64_Rel *entry = &this->rela_or_rel.rel[index];
+        this->ResolveSymbolRelAbsolute(entry);
+    }
+
+    for (uint64_t index = this->rela_count;
+         index < this->rela_dyn_size / sizeof(Elf64_Rela); index++) {
+        Elf64_Rela *entry = &this->rela_or_rel.rela[index];
+        this->ResolveSymbolRelaAbsolute(entry);
+    }
+
+    if (this->is_rela) {
+        if (this->rela_or_rel_plt_size >= sizeof(Elf64_Rela)) {
+            for (uint64_t index = 0;
+                 index < this->rela_or_rel_plt_size / sizeof(Elf64_Rela);
+                 index++) {
+                Elf64_Rela *entry = &this->rela_or_rel_plt.rela[index];
+                this->ResolveSymbolRelaJumpSlot(entry, do_lazy_got_init);
+            }
+        }
+    } else if (this->rela_or_rel_plt_size >= sizeof(Elf64_Rel)) {
+        for (uint64_t index = 0;
+             index < this->rela_or_rel_plt_size / sizeof(Elf64_Rel); index++) {
+            Elf64_Rel *entry = &this->rela_or_rel_plt.rel[index];
+            this->ResolveSymbolRelJumpSlot(entry, do_lazy_got_init);
+        }
+    }
+
+    if (this->got) {
+        this->got[1] = this;
+        this->got[2] = (void *)__rtld_runtime_resolve;
+    }
+}
+
 }  // namespace rtld

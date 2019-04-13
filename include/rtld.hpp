@@ -22,10 +22,9 @@ static_assert(sizeof(module_object_list_t) == 0x10,
 typedef Elf64_Addr (*lookup_global_t)(const char *);
 
 Elf64_Addr lookup_global_auto(const char *name);
-void resolve_symbols(ModuleObject *module_object, bool do_lazy_got_init);
-
 extern module_object_list_t g_pManualLoadList;
 extern module_object_list_t g_pAutoLoadList;
 extern bool g_RoDebugFlag;
 extern lookup_global_t g_LookupGlobalManualFunctionPointer;
 extern bool g_IsExceptionHandlerReady;
+extern "C" void __rtld_runtime_resolve(void);
