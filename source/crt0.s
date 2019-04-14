@@ -70,7 +70,7 @@ unhandled_exception:
 .word 8
 .ascii "oss-rtld"
 
-.section ".rodata"
+.section ".rodata.mod0"
 .global __nx_mod0
 __nx_mod0:
     .ascii "MOD0"

@@ -76,7 +76,6 @@ export CFLAGS_FOR_TARGET = $(CC_FLAGS) -Wno-unused-command-line-argument -Wno-er
 NAME = oss-rtld
 
 all: $(NAME).nso
-	@echo $(OBJECTS)
 
 # start compiler-rt definitions
 LIB_COMPILER_RT_BUILTINS := $(BUILD_DIR)/compiler-rt/lib/libclang_rt.builtins-aarch64.a
