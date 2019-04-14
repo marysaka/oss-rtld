@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstring>
-
+#include <string.h>
 #include "svc.h"
 
 #define WEAK __attribute__((weak))

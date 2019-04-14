@@ -1,7 +1,5 @@
 #include "rtld.hpp"
 
-#include <algorithm>
-
 Elf64_Addr lookup_global_auto(const char *name) {
     if (g_pAutoLoadList.back == (ModuleObject *)&g_pAutoLoadList) {
         return 0;
@@ -50,6 +48,9 @@ extern "C" Elf64_Addr __rtld_lazy_bind_symbol(ModuleObject *module,
 }
 
 extern "C" void __rtld_modules_init(void) {
-    std::for_each(g_pAutoLoadList.rbegin(), g_pAutoLoadList.rend(),
-                  [](ModuleObject *module) { module->dt_init(); });
+    for (auto iter = g_pAutoLoadList.rbegin(); iter != g_pAutoLoadList.rend();
+         ++iter) {
+        auto module = *iter;
+        module->dt_init();
+    }
 }
