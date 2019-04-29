@@ -1,7 +1,7 @@
 #include "rtld.hpp"
 #include "sdk_init.hpp"
 
-bool g_IsExceptionHandlerReady;
+bool rtld::g_IsExceptionHandlerReady;
 
 extern "C" void __rtld_notify_exception_handler_ready(void) {
     g_IsExceptionHandlerReady = true;

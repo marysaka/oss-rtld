@@ -1,10 +1,12 @@
 #include "rtld.hpp"
 
-__attribute__((section(".bss"))) ModuleObject __nx_module_runtime;
+namespace rtld {
 ModuleObjectList g_pManualLoadList;
 ModuleObjectList g_pAutoLoadList;
 bool g_RoDebugFlag;
 lookup_global_t g_LookupGlobalManualFunctionPointer;
+__attribute__((section(".bss"))) ModuleObject __nx_module_runtime;
+};  // namespace rtld
 
 inline void relocate_self(uint64_t alsr_base, Elf64_Dyn *dynamic) {
     uint64_t rela = 0;

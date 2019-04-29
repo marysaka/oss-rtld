@@ -7,7 +7,9 @@
 .extern __rtld_modules_init
 .extern __rtld_lazy_bind_symbol
 .extern __rtld_start_app
-.extern g_IsExceptionHandlerReady
+
+.extern _ZN4rtld19__nx_module_runtimeE
+.extern _ZN4rtld25g_IsExceptionHandlerReadyE
 
 .macro FUNC_RELATIVE_ASLR name, register_num, symbol
 .word \symbol - .
@@ -42,7 +44,7 @@ FUNC_RELATIVE_ASLR __clean_bss_shim, 2, __bss_end__
 FUNC_RELATIVE_ASLR __start_shim, 0, __module_start
     bl __start
 
-FUNC_RELATIVE_ASLR __start, 1, _DYNAMIC
+FUNC_RELATIVE_ASLR __start, 1, __dynamic_start__
     bl __rtld_relocate_modules
     mov w0, w19
     adrp x1, __argdata__
@@ -57,7 +59,7 @@ FUNC_RELATIVE_ASLR general_init, 3, __rtld_modules_init
 
 __entry_exception_shim:
     b handle_exception_shim
-FUNC_RELATIVE_ASLR handle_exception_shim 2 g_IsExceptionHandlerReady
+FUNC_RELATIVE_ASLR handle_exception_shim 2 _ZN4rtld25g_IsExceptionHandlerReadyE
     cbz w2, unhandled_exception
     bl __rtld_handle_exception
 unhandled_exception:
@@ -74,9 +76,9 @@ unhandled_exception:
 .global __nx_mod0
 __nx_mod0:
     .ascii "MOD0"
-    .word  _DYNAMIC             - __nx_mod0
+    .word  __dynamic_start__    - __nx_mod0
     .word  __bss_start__        - __nx_mod0
     .word  __bss_end__          - __nx_mod0
     .word  0
     .word  0
-    .word __nx_module_runtime - __nx_mod0
+    .word _ZN4rtld19__nx_module_runtimeE - __nx_mod0

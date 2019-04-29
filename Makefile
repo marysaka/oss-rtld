@@ -44,8 +44,6 @@ AS_FLAGS := -arch=aarch64 -triple $(TARGET_TRIPLET)
 
 LD_FLAGS := -T $(SOURCE_ROOT)/misc/rtld.ld \
             -shared \
-            --discard-all \
-            --strip-all \
             --version-script=$(SOURCE_ROOT)/exported.txt \
             -init=__rtld_init \
             -fini=__rtld_fini \

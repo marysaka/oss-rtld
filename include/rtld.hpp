@@ -14,10 +14,13 @@ using namespace rtld;
 
 typedef Elf64_Addr (*lookup_global_t)(const char *);
 
+extern "C" void __rtld_runtime_resolve(void);
+
+namespace rtld {
 Elf64_Addr lookup_global_auto(const char *name);
 extern ModuleObjectList g_pManualLoadList;
 extern ModuleObjectList g_pAutoLoadList;
 extern bool g_RoDebugFlag;
 extern lookup_global_t g_LookupGlobalManualFunctionPointer;
 extern bool g_IsExceptionHandlerReady;
-extern "C" void __rtld_runtime_resolve(void);
+}  // namespace rtld

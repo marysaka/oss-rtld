@@ -1,6 +1,6 @@
 #include "rtld.hpp"
 
-Elf64_Addr lookup_global_auto(const char *name) {
+Elf64_Addr rtld::lookup_global_auto(const char *name) {
     if (g_pAutoLoadList.back == (ModuleObject *)&g_pAutoLoadList) {
         return 0;
     }
