@@ -8,20 +8,20 @@ lookup_global_t g_LookupGlobalManualFunctionPointer;
 __attribute__((section(".bss"))) ModuleObject __nx_module_runtime;
 };  // namespace rtld
 
-inline void relocate_self(uint64_t alsr_base, Elf64_Dyn *dynamic) {
-    uint64_t rela = 0;
-    uint64_t rel = 0;
+inline void relocate_self(char *alsr_base, Elf_Dyn *dynamic) {
+    Elf_Addr rela = 0;
+    Elf_Addr rel = 0;
 
-    uint64_t rela_entry_size = sizeof(Elf64_Rela);
-    uint64_t rel_entry_size = sizeof(Elf64_Rel);
+    Elf_Xword rela_entry_size = sizeof(Elf_Rela);
+    Elf_Xword rel_entry_size = sizeof(Elf_Rel);
 
-    uint64_t rela_entry_count = 0;
-    uint64_t rel_entry_count = 0;
+    Elf_Xword rela_entry_count = 0;
+    Elf_Xword rel_entry_count = 0;
 
     for (; dynamic->d_tag != DT_NULL; dynamic++) {
         switch (dynamic->d_tag) {
             case DT_RELA:
-                rela = (alsr_base + dynamic->d_un.d_ptr);
+                rela = ((Elf_Addr)alsr_base + dynamic->d_un.d_ptr);
                 break;
 
             case DT_RELAENT:
@@ -29,7 +29,7 @@ inline void relocate_self(uint64_t alsr_base, Elf64_Dyn *dynamic) {
                 break;
 
             case DT_REL:
-                rel = (alsr_base + dynamic->d_un.d_ptr);
+                rel = ((Elf_Addr)alsr_base + dynamic->d_un.d_ptr);
                 break;
 
             case DT_RELENT:
@@ -66,14 +66,14 @@ inline void relocate_self(uint64_t alsr_base, Elf64_Dyn *dynamic) {
     }
 
     if (rel_entry_count) {
-        uint64_t i = 0;
+        Elf_Xword i = 0;
 
         while (i < rel_entry_count) {
-            Elf64_Rel *entry = (Elf64_Rel *)(rel + (i * rel_entry_size));
-            switch (ELF64_R_TYPE(entry->r_info)) {
-                case R_AARCH64_RELATIVE: {
-                    uint64_t *ptr = (uint64_t *)(alsr_base + entry->r_offset);
-                    *ptr += alsr_base;
+            Elf_Rel *entry = (Elf_Rel *)(rel + (i * rel_entry_size));
+            switch (ELF_R_TYPE(entry->r_info)) {
+                case ARCH_RELATIVE: {
+                    Elf_Addr *ptr = (Elf_Addr *)(alsr_base + entry->r_offset);
+                    *ptr += (Elf_Addr)alsr_base;
                     break;
                 }
             }
@@ -82,14 +82,14 @@ inline void relocate_self(uint64_t alsr_base, Elf64_Dyn *dynamic) {
     }
 
     if (rela_entry_count) {
-        uint64_t i = 0;
+        Elf_Xword i = 0;
 
         while (i < rela_entry_count) {
-            Elf64_Rela *entry = (Elf64_Rela *)(rela + (i * rela_entry_size));
-            switch (ELF64_R_TYPE(entry->r_info)) {
-                case R_AARCH64_RELATIVE: {
-                    uint64_t *ptr = (uint64_t *)(alsr_base + entry->r_offset);
-                    *ptr = alsr_base + entry->r_addend;
+            Elf_Rela *entry = (Elf_Rela *)(rela + (i * rela_entry_size));
+            switch (ELF_R_TYPE(entry->r_info)) {
+                case ARCH_RELATIVE: {
+                    Elf_Addr *ptr = (Elf_Addr *)(alsr_base + entry->r_offset);
+                    *ptr = (Elf_Addr)alsr_base + entry->r_addend;
                     break;
                 }
             }
@@ -98,8 +98,7 @@ inline void relocate_self(uint64_t alsr_base, Elf64_Dyn *dynamic) {
     }
 }
 
-extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
-                                        Elf64_Dyn *dynamic) {
+extern "C" void __rtld_relocate_modules(char *aslr_base, Elf_Dyn *dynamic) {
     relocate_self(aslr_base, dynamic);
 
     // Init global lists
@@ -136,7 +135,7 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
         }
 
         if (memory_info.permission == 5 && memory_info.type == 3 &&
-            memory_info.address != aslr_base) {
+            memory_info.address != (uint64_t)aslr_base) {
             char *module_header_address =
                 (char *)(memory_info.address +
                          *(uint32_t *)(memory_info.address + 4));
@@ -157,13 +156,14 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
             ModuleObject *module_object =
                 (ModuleObject *)(module_header_address +
                                  module_header->module_object_offset);
-            Elf64_Dyn *module_dynamic =
-                (Elf64_Dyn *)(module_header_address +
-                              module_header->dynamic_offset);
+            Elf_Dyn *module_dynamic =
+                (Elf_Dyn *)(module_header_address +
+                            module_header->dynamic_offset);
 
             module_object->next = module_object;
             module_object->prev = module_object;
-            module_object->Initialize(memory_info.address, module_dynamic);
+            module_object->Initialize((char *)memory_info.address,
+                                      module_dynamic);
             module_object->Relocate();
 
             next_module = module_object->next;
@@ -183,9 +183,9 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
     }
 
     for (ModuleObject *module : g_pAutoLoadList) {
-        Elf64_Sym *symbol =
+        Elf_Sym *symbol =
             module->GetSymbolByName("_ZN2nn2ro6detail15g_pAutoLoadListE");
-        if (symbol && ELF64_ST_BIND(symbol->st_info)) {
+        if (symbol && ELF_ST_BIND(symbol->st_info)) {
             ModuleObjectList **symbol_val =
                 (ModuleObjectList **)(module->module_base + symbol->st_value);
             *symbol_val = &g_pAutoLoadList;
@@ -193,14 +193,14 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
 
         symbol =
             module->GetSymbolByName("_ZN2nn2ro6detail17g_pManualLoadListE");
-        if (symbol && ELF64_ST_BIND(symbol->st_info)) {
+        if (symbol && ELF_ST_BIND(symbol->st_info)) {
             ModuleObjectList **symbol_val =
                 (ModuleObjectList **)(module->module_base + symbol->st_value);
             *symbol_val = &g_pManualLoadList;
         }
 
         symbol = module->GetSymbolByName("_ZN2nn2ro6detail14g_pRoDebugFlagE");
-        if (symbol && ELF64_ST_BIND(symbol->st_info)) {
+        if (symbol && ELF_ST_BIND(symbol->st_info)) {
             bool **symbol_val =
                 (bool **)(module->module_base + symbol->st_value);
             *symbol_val = &g_RoDebugFlag;
@@ -208,7 +208,7 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
 
         symbol = module->GetSymbolByName(
             "_ZN2nn2ro6detail34g_pLookupGlobalAutoFunctionPointerE");
-        if (symbol && ELF64_ST_BIND(symbol->st_info)) {
+        if (symbol && ELF_ST_BIND(symbol->st_info)) {
             lookup_global_t *symbol_val =
                 (lookup_global_t *)(module->module_base + symbol->st_value);
             *symbol_val = lookup_global_auto;
@@ -216,7 +216,7 @@ extern "C" void __rtld_relocate_modules(uint64_t aslr_base,
 
         symbol = module->GetSymbolByName(
             "_ZN2nn2ro6detail36g_pLookupGlobalManualFunctionPointerE");
-        if (symbol && ELF64_ST_BIND(symbol->st_info)) {
+        if (symbol && ELF_ST_BIND(symbol->st_info)) {
             lookup_global_t *symbol_val =
                 (lookup_global_t *)(module->module_base + symbol->st_value);
             *symbol_val = g_LookupGlobalManualFunctionPointer;

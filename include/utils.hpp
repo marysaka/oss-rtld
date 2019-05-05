@@ -15,4 +15,4 @@ static inline void print_unresolved_symbol(const char *name) {
     debug_print("'\n");
 }
 
-uint64_t elf_hash(const char *name);
+unsigned long elf_hash(const char *name);

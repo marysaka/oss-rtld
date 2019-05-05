@@ -28,21 +28,26 @@ AR := $(LLVM_BINDIR)/llvm-ar
 RANLIB := $(LLVM_BINDIR)/llvm-ranlib
 # end llvm programs
 
+ARCH := aarch64
+AS_ARCH := -arch=$(ARCH)
+CC_ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57
+TARGET_TRIPLET = aarch64-none-linux-gnu
+
 SOURCE_ROOT = .
-SRC_DIR = $(SOURCE_ROOT)/source
-BUILD_DIR := $(SOURCE_ROOT)/build
-LIB_DIR = $(BUILD_DIR)/lib/
-TARGET_TRIPLET = aarch64-none-switch
+SRC_DIR = $(SOURCE_ROOT)/source $(SOURCE_ROOT)/source/$(ARCH)
+BUILD_DIR := $(SOURCE_ROOT)/build/$(ARCH)
 LINK_SCRIPT = link.T
 
+export VPATH := $(foreach dir,$(SRC_DIR),$(CURDIR)/$(dir)) $(BUILD_DIR)
+
 # For compiler-rt, we need some system header
-SYS_INCLUDES := -isystem $(realpath $(SOURCE_ROOT))/include/ -isystem $(realpath $(SOURCE_ROOT))/misc/system/include
-CC_FLAGS := -g -fPIC -fexceptions -fuse-ld=lld -fno-stack-protector -mtune=cortex-a57 -target aarch64-none-linux-gnu -nostdlib -nostdlibinc $(SYS_INCLUDES) -Wno-unused-command-line-argument -Wall -Wextra -O2 -ffunction-sections -fdata-sections
+SYS_INCLUDES := -isystem $(realpath $(SOURCE_ROOT))/include/ -isystem $(realpath $(SOURCE_ROOT))/misc/$(ARCH) -isystem $(realpath $(SOURCE_ROOT))/misc/system/include
+CC_FLAGS := -fuse-ld=lld -fno-stack-protector -target $(TARGET_TRIPLET) $(CC_ARCH) -fPIC -nostdlib -nostdlibinc $(SYS_INCLUDES) -Wno-unused-command-line-argument -Wall -Wextra -O2 -ffunction-sections -fdata-sections
 CXX_FLAGS := $(CC_FLAGS) -std=c++17 -stdlib=libc++ -nodefaultlibs -nostdinc++ -fno-rtti -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables
 AR_FLAGS := rcs
-AS_FLAGS := -arch=aarch64 -triple $(TARGET_TRIPLET)
+AS_FLAGS := $(AS_ARCH)
 
-LD_FLAGS := -T $(SOURCE_ROOT)/misc/rtld.ld \
+LD_FLAGS := -T $(SOURCE_ROOT)/misc/$(ARCH)/rtld.ld \
             -shared \
             --version-script=$(SOURCE_ROOT)/exported.txt \
             -init=__rtld_init \
@@ -66,35 +71,41 @@ export AS
 export AR
 export LD_FOR_TARGET = $(LD)
 export CC_FOR_TARGET = $(CC)
-export AS_FOR_TARGET = $(AS) -arch=aarch64 -mattr=+neon
+export AS_FOR_TARGET = $(AS) -arch=$(ARCH)
 export AR_FOR_TARGET = $(AR)
 export RANLIB_FOR_TARGET = $(RANLIB)
 export CFLAGS_FOR_TARGET = $(CC_FLAGS) -Wno-unused-command-line-argument -Wno-error-implicit-function-declaration
+export TARGET_TRIPLET
 
 NAME = oss-rtld
 
 all: $(NAME).nso
 
 # start compiler-rt definitions
-LIB_COMPILER_RT_BUILTINS := $(BUILD_DIR)/compiler-rt/lib/libclang_rt.builtins-aarch64.a
+LIB_COMPILER_RT_BUILTINS := $(BUILD_DIR)/compiler-rt/lib/libclang_rt.builtins-$(ARCH).a
 include mk/compiler-rt.mk
 # end compiler-rt definitions
 
-CFILES   := $(addprefix $(SRC_DIR)/, $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.c))))
-CPPFILES := $(addprefix $(SRC_DIR)/, $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.cpp))))
-ASMFILES := $(addprefix $(SRC_DIR)/, $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.s))))
+CFILES   := $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.c)))
+CPPFILES := $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.cpp)))
+ASMFILES := $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.s)))
 
-OBJECTS = $(LIB_COMPILER_RT_BUILTINS) $(CFILES:.c=.o) $(CPPFILES:.cpp=.o) $(ASMFILES:.s=.o)
+OBJECTS = $(LIB_COMPILER_RT_BUILTINS) $(addprefix $(BUILD_DIR)/, $(CFILES:.c=.o) $(CPPFILES:.cpp=.o) $(ASMFILES:.s=.o))
 
-%.o: %.s
+$(BUILD_DIR)/%.o: %.s
 	$(AS) $(AS_FLAGS) -filetype=obj -o $@ $<
 
-$(NAME).elf: $(OBJECTS)
+$(BUILD_DIR)/%.o: %.c
+	$(CC) $(CC_FLAGS) -o $@ -c $<
+
+$(BUILD_DIR)/%.o: %.cpp
+	$(CXX) $(CXX_FLAGS) -o $@ -c $<
+
+$(BUILD_DIR)/$(NAME).elf: $(OBJECTS)
 	$(LD) $(LD_FLAGS) -o $@ $+
 
-%.nso: %.elf
+%.nso: $(BUILD_DIR)/%.elf
 	$(LINKLE) nso $< $@
 
-
 clean: clean_compiler-rt
-	rm -rf $(OBJECTS) $(NAME).elf $(NAME).nso
+	rm -rf $(OBJECTS) $(BUILD_DIR)/$(NAME).elf $(NAME).nso

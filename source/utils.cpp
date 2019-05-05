@@ -26,9 +26,9 @@ extern "C" int strcmp(const char *s1, const char *s2) {
     return (*(const unsigned char *)s1 - *(const unsigned char *)s2);
 }
 
-uint64_t elf_hash(const char *name) {
-    uint64_t h = 0;
-    uint64_t g;
+unsigned long elf_hash(const char *name) {
+    unsigned long h = 0;
+    unsigned long g;
 
     while (*name) {
         h = (h << 4) + *name++;

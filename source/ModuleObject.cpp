@@ -2,7 +2,7 @@
 
 namespace rtld {
 
-void ModuleObject::Initialize(uint64_t aslr_base, Elf64_Dyn *dynamic) {
+void ModuleObject::Initialize(char *aslr_base, Elf_Dyn *dynamic) {
 #ifdef __RTLD_6XX__
     this->nro_size = 0;
     this->soname_idx = 0;
@@ -60,19 +60,19 @@ void ModuleObject::Initialize(uint64_t aslr_base, Elf64_Dyn *dynamic) {
             }
 
             case DT_SYMTAB: {
-                this->dynsym = (Elf64_Sym *)(aslr_base + dynamic->d_un.d_val);
+                this->dynsym = (Elf_Sym *)(aslr_base + dynamic->d_un.d_val);
                 break;
             }
 
             case DT_REL: {
                 this->rela_or_rel.rel =
-                    (Elf64_Rel *)(aslr_base + dynamic->d_un.d_val);
+                    (Elf_Rel *)(aslr_base + dynamic->d_un.d_val);
                 break;
             }
 
             case DT_RELA: {
                 this->rela_or_rel.rela =
-                    (Elf64_Rela *)(aslr_base + dynamic->d_un.d_val);
+                    (Elf_Rela *)(aslr_base + dynamic->d_un.d_val);
                 break;
             }
 
@@ -82,14 +82,14 @@ void ModuleObject::Initialize(uint64_t aslr_base, Elf64_Dyn *dynamic) {
             }
 
             case DT_RELAENT: {
-                if (dynamic->d_un.d_val != sizeof(Elf64_Rela)) {
+                if (dynamic->d_un.d_val != sizeof(Elf_Rela)) {
                     svcBreak(0, 0, 0);
                 }
                 break;
             }
 
             case DT_SYMENT: {
-                if (dynamic->d_un.d_val != sizeof(Elf64_Sym)) {
+                if (dynamic->d_un.d_val != sizeof(Elf_Sym)) {
                     svcBreak(0, 0, 0);
                 }
                 break;
@@ -116,14 +116,14 @@ void ModuleObject::Initialize(uint64_t aslr_base, Elf64_Dyn *dynamic) {
             }
 
             case DT_RELENT: {
-                if (dynamic->d_un.d_val != sizeof(Elf64_Rel)) {
+                if (dynamic->d_un.d_val != sizeof(Elf_Rel)) {
                     svcBreak(0, 0, 0);
                 }
                 break;
             }
 
             case DT_PLTREL: {
-                uint64_t value = dynamic->d_un.d_val;
+                Elf_Xword value = dynamic->d_un.d_val;
                 this->is_rela = value == DT_RELA;
                 if (value != DT_REL && value != DT_RELA) {
                     svcBreak(0, 0, 0);
@@ -165,13 +165,13 @@ void ModuleObject::Initialize(uint64_t aslr_base, Elf64_Dyn *dynamic) {
 
 void ModuleObject::Relocate() {
     if (this->rela_count) {
-        for (uint64_t i = 0; i < this->rel_count; i++) {
-            Elf64_Rel *entry = &this->rela_or_rel.rel[i];
-            switch (ELF64_R_TYPE(entry->r_info)) {
-                case R_AARCH64_RELATIVE: {
-                    uint64_t *ptr =
-                        (uint64_t *)(this->module_base + entry->r_offset);
-                    *ptr += this->module_base;
+        for (auto i = 0u; i < this->rel_count; i++) {
+            Elf_Rel *entry = &this->rela_or_rel.rel[i];
+            switch (ELF_R_TYPE(entry->r_info)) {
+                case ARCH_RELATIVE: {
+                    Elf_Addr *ptr =
+                        (Elf_Addr *)(this->module_base + entry->r_offset);
+                    *ptr += (Elf_Addr)this->module_base;
                     break;
                 }
             }
@@ -179,13 +179,13 @@ void ModuleObject::Relocate() {
     }
 
     if (this->rela_count) {
-        for (uint64_t i = 0; i < this->rela_count; i++) {
-            Elf64_Rela *entry = &this->rela_or_rel.rela[i];
-            switch (ELF64_R_TYPE(entry->r_info)) {
-                case R_AARCH64_RELATIVE: {
-                    uint64_t *ptr =
-                        (uint64_t *)(this->module_base + entry->r_offset);
-                    *ptr = this->module_base + entry->r_addend;
+        for (auto i = 0u; i < this->rela_count; i++) {
+            Elf_Rela *entry = &this->rela_or_rel.rela[i];
+            switch (ELF_R_TYPE(entry->r_info)) {
+                case ARCH_RELATIVE: {
+                    Elf_Addr *ptr =
+                        (Elf_Addr *)(this->module_base + entry->r_offset);
+                    *ptr = (Elf_Addr)this->module_base + entry->r_addend;
                     break;
                 }
             }
@@ -193,8 +193,8 @@ void ModuleObject::Relocate() {
     }
 }
 
-Elf64_Sym *ModuleObject::GetSymbolByName(const char *name) {
-    uint64_t name_hash = elf_hash(name);
+Elf_Sym *ModuleObject::GetSymbolByName(const char *name) {
+    unsigned long name_hash = elf_hash(name);
 
     for (uint32_t i = this->hash_bucket[name_hash % this->hash_nbucket_value];
          i; i = this->hash_chain[i]) {
@@ -210,22 +210,22 @@ Elf64_Sym *ModuleObject::GetSymbolByName(const char *name) {
     return nullptr;
 }
 
-bool ModuleObject::TryResolveSymbol(Elf64_Addr *target_symbol_address,
-                                    Elf64_Sym *symbol) {
+bool ModuleObject::TryResolveSymbol(Elf_Addr *target_symbol_address,
+                                    Elf_Sym *symbol) {
     const char *name = &this->dynstr[symbol->st_name];
 
-    if (ELF64_ST_VISIBILITY(symbol->st_other)) {
-        Elf64_Sym *target_symbol = this->GetSymbolByName(name);
+    if (ELF_ST_VISIBILITY(symbol->st_other)) {
+        Elf_Sym *target_symbol = this->GetSymbolByName(name);
         if (target_symbol) {
             *target_symbol_address =
-                this->module_base + target_symbol->st_value;
+                (Elf_Addr)this->module_base + target_symbol->st_value;
             return true;
-        } else if ((ELF64_ST_BIND(symbol->st_info) & STB_WEAK) == STB_WEAK) {
+        } else if ((ELF_ST_BIND(symbol->st_info) & STB_WEAK) == STB_WEAK) {
             *target_symbol_address = 0;
             return true;
         }
     } else {
-        Elf64_Addr address = lookup_global_auto(name);
+        Elf_Addr address = lookup_global_auto(name);
 
         if (address == 0 && g_LookupGlobalManualFunctionPointer) {
             address = g_LookupGlobalManualFunctionPointer(name);
@@ -239,18 +239,17 @@ bool ModuleObject::TryResolveSymbol(Elf64_Addr *target_symbol_address,
     return false;
 }
 
-void ModuleObject::ResolveSymbolRelAbsolute(Elf64_Rel *entry) {
-    uint32_t r_type = ELF64_R_TYPE(entry->r_info);
-    uint32_t r_sym = ELF64_R_SYM(entry->r_info);
+void ModuleObject::ResolveSymbolRelAbsolute(Elf_Rel *entry) {
+    uint32_t r_type = ELF_R_TYPE(entry->r_info);
+    uint32_t r_sym = ELF_R_SYM(entry->r_info);
 
-    if (r_type == R_AARCH64_ABS32 || r_type == R_AARCH64_ABS64 ||
-        r_type == R_AARCH64_GLOB_DAT) {
-        Elf64_Sym *symbol = &this->dynsym[r_sym];
-        Elf64_Addr target_symbol_address;
+    if (ARCH_IS_REL_ABSOLUTE(r_type) || r_type == ARCH_GLOB_DAT) {
+        Elf_Sym *symbol = &this->dynsym[r_sym];
+        Elf_Addr target_symbol_address;
 
         if (this->TryResolveSymbol(&target_symbol_address, symbol)) {
-            uint64_t *target =
-                (uint64_t *)(this->module_base + entry->r_offset);
+            Elf_Addr *target =
+                (Elf_Addr *)(this->module_base + entry->r_offset);
             *target += target_symbol_address;
         } else if (g_RoDebugFlag) {
             print_unresolved_symbol(&this->dynstr[symbol->st_name]);
@@ -258,18 +257,17 @@ void ModuleObject::ResolveSymbolRelAbsolute(Elf64_Rel *entry) {
     }
 }
 
-void ModuleObject::ResolveSymbolRelaAbsolute(Elf64_Rela *entry) {
-    uint32_t r_type = ELF64_R_TYPE(entry->r_info);
-    uint32_t r_sym = ELF64_R_SYM(entry->r_info);
+void ModuleObject::ResolveSymbolRelaAbsolute(Elf_Rela *entry) {
+    uint32_t r_type = ELF_R_TYPE(entry->r_info);
+    uint32_t r_sym = ELF_R_SYM(entry->r_info);
 
-    if (r_type == R_AARCH64_ABS32 || r_type == R_AARCH64_ABS64 ||
-        r_type == R_AARCH64_GLOB_DAT) {
-        Elf64_Sym *symbol = &this->dynsym[r_sym];
-        Elf64_Addr target_symbol_address;
+    if (ARCH_IS_REL_ABSOLUTE(r_type) || r_type == ARCH_GLOB_DAT) {
+        Elf_Sym *symbol = &this->dynsym[r_sym];
+        Elf_Addr target_symbol_address;
 
         if (this->TryResolveSymbol(&target_symbol_address, symbol)) {
-            uint64_t *target =
-                (uint64_t *)(this->module_base + entry->r_offset);
+            Elf_Addr *target =
+                (Elf_Addr *)(this->module_base + entry->r_offset);
             *target = target_symbol_address + entry->r_addend;
         } else if (g_RoDebugFlag) {
             print_unresolved_symbol(&this->dynstr[symbol->st_name]);
@@ -277,30 +275,30 @@ void ModuleObject::ResolveSymbolRelaAbsolute(Elf64_Rela *entry) {
     }
 }
 
-void ModuleObject::ResolveSymbolRelJumpSlot(Elf64_Rel *entry,
+void ModuleObject::ResolveSymbolRelJumpSlot(Elf_Rel *entry,
                                             bool do_lazy_got_init) {
-    uint32_t r_type = ELF64_R_TYPE(entry->r_info);
-    uint32_t r_sym = ELF64_R_SYM(entry->r_info);
+    uint32_t r_type = ELF_R_TYPE(entry->r_info);
+    uint32_t r_sym = ELF_R_SYM(entry->r_info);
 
-    if (r_type == R_AARCH64_JUMP_SLOT) {
-        uint64_t *target = (uint64_t *)(this->module_base + entry->r_offset);
-        uint64_t target_address = this->module_base + *target;
+    if (r_type == ARCH_JUMP_SLOT) {
+        Elf_Addr *target = (Elf_Addr *)(this->module_base + entry->r_offset);
+        Elf_Addr target_address = (Elf_Addr)this->module_base + *target;
         if (do_lazy_got_init) {
             *target = target_address;
         }
 
         if (this->got_stub_ptr) {
-            if (this->got_stub_ptr != target_address) {
+            if (this->got_stub_ptr != (void *)target_address) {
                 svcBreak(0, 0, 0);
             }
         } else {
-            this->got_stub_ptr = target_address;
+            this->got_stub_ptr = (void *)target_address;
         }
 
         // We are in the non lazy case
         if (!do_lazy_got_init) {
-            Elf64_Sym *symbol = &this->dynsym[r_sym];
-            Elf64_Addr target_symbol_address;
+            Elf_Sym *symbol = &this->dynsym[r_sym];
+            Elf_Addr target_symbol_address;
 
             if (this->TryResolveSymbol(&target_symbol_address, symbol)) {
                 *target += target_symbol_address;
@@ -314,30 +312,30 @@ void ModuleObject::ResolveSymbolRelJumpSlot(Elf64_Rel *entry,
     }
 }
 
-void ModuleObject::ResolveSymbolRelaJumpSlot(Elf64_Rela *entry,
+void ModuleObject::ResolveSymbolRelaJumpSlot(Elf_Rela *entry,
                                              bool do_lazy_got_init) {
-    uint32_t r_type = ELF64_R_TYPE(entry->r_info);
-    uint32_t r_sym = ELF64_R_SYM(entry->r_info);
+    uint32_t r_type = ELF_R_TYPE(entry->r_info);
+    uint32_t r_sym = ELF_R_SYM(entry->r_info);
 
-    if (r_type == R_AARCH64_JUMP_SLOT) {
-        uint64_t *target = (uint64_t *)(this->module_base + entry->r_offset);
-        uint64_t target_address = this->module_base + *target;
+    if (r_type == ARCH_JUMP_SLOT) {
+        Elf_Addr *target = (Elf_Addr *)(this->module_base + entry->r_offset);
+        Elf_Addr target_address = (Elf_Addr)this->module_base + *target;
         if (do_lazy_got_init) {
             *target = target_address;
         }
 
         if (this->got_stub_ptr) {
-            if (this->got_stub_ptr != target_address) {
+            if (this->got_stub_ptr != (void *)target_address) {
                 svcBreak(0, 0, 0);
             }
         } else {
-            this->got_stub_ptr = target_address;
+            this->got_stub_ptr = (void *)target_address;
         }
 
         // We are in the non lazy case
         if (!do_lazy_got_init) {
-            Elf64_Sym *symbol = &this->dynsym[r_sym];
-            Elf64_Addr target_symbol_address;
+            Elf_Sym *symbol = &this->dynsym[r_sym];
+            Elf_Addr target_symbol_address;
 
             if (this->TryResolveSymbol(&target_symbol_address, symbol)) {
                 *target = target_symbol_address + entry->r_addend;
@@ -352,31 +350,31 @@ void ModuleObject::ResolveSymbolRelaJumpSlot(Elf64_Rela *entry,
 }
 
 void ModuleObject::ResolveSymbols(bool do_lazy_got_init) {
-    for (uint64_t index = this->rel_count;
-         index < this->rel_dyn_size / sizeof(Elf64_Rel); index++) {
-        Elf64_Rel *entry = &this->rela_or_rel.rel[index];
+    for (auto index = this->rel_count;
+         index < this->rel_dyn_size / sizeof(Elf_Rel); index++) {
+        Elf_Rel *entry = &this->rela_or_rel.rel[index];
         this->ResolveSymbolRelAbsolute(entry);
     }
 
-    for (uint64_t index = this->rela_count;
-         index < this->rela_dyn_size / sizeof(Elf64_Rela); index++) {
-        Elf64_Rela *entry = &this->rela_or_rel.rela[index];
+    for (auto index = this->rela_count;
+         index < this->rela_dyn_size / sizeof(Elf_Rela); index++) {
+        Elf_Rela *entry = &this->rela_or_rel.rela[index];
         this->ResolveSymbolRelaAbsolute(entry);
     }
 
     if (this->is_rela) {
-        if (this->rela_or_rel_plt_size >= sizeof(Elf64_Rela)) {
-            for (uint64_t index = 0;
-                 index < this->rela_or_rel_plt_size / sizeof(Elf64_Rela);
+        if (this->rela_or_rel_plt_size >= sizeof(Elf_Rela)) {
+            for (auto index = 0u;
+                 index < this->rela_or_rel_plt_size / sizeof(Elf_Rela);
                  index++) {
-                Elf64_Rela *entry = &this->rela_or_rel_plt.rela[index];
+                Elf_Rela *entry = &this->rela_or_rel_plt.rela[index];
                 this->ResolveSymbolRelaJumpSlot(entry, do_lazy_got_init);
             }
         }
-    } else if (this->rela_or_rel_plt_size >= sizeof(Elf64_Rel)) {
-        for (uint64_t index = 0;
-             index < this->rela_or_rel_plt_size / sizeof(Elf64_Rel); index++) {
-            Elf64_Rel *entry = &this->rela_or_rel_plt.rel[index];
+    } else if (this->rela_or_rel_plt_size >= sizeof(Elf_Rel)) {
+        for (auto index = 0u;
+             index < this->rela_or_rel_plt_size / sizeof(Elf_Rel); index++) {
+            Elf_Rel *entry = &this->rela_or_rel_plt.rel[index];
             this->ResolveSymbolRelJumpSlot(entry, do_lazy_got_init);
         }
     }
