@@ -19,7 +19,6 @@ typedef Elf64_Xword Elf_Xword;
 // Relocation related.
 #define ARCH_RELATIVE R_AARCH64_RELATIVE
 #define ARCH_JUMP_SLOT R_AARCH64_JUMP_SLOT
-#define ARCH_JUMP_SLOT R_AARCH64_JUMP_SLOT
 #define ARCH_GLOB_DAT R_AARCH64_GLOB_DAT
 #define ARCH_IS_REL_ABSOLUTE(type) \
     type == R_AARCH64_ABS32 || type == R_AARCH64_ABS64

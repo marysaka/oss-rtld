@@ -61,8 +61,16 @@ struct ModuleObject {
 };
 
 #ifdef __RTLD_6XX__
+#ifdef __aarch64__
 static_assert(sizeof(ModuleObject) == 0xD0, "ModuleObject size isn't valid");
+#elif __arm__
+static_assert(sizeof(ModuleObject) == 0x68, "ModuleObject size isn't valid");
+#endif
 #else
+#ifdef __aarch64__
 static_assert(sizeof(ModuleObject) == 0xB8, "ModuleObject size isn't valid");
+#elif __arm__
+static_assert(sizeof(ModuleObject) == 0x5C, "ModuleObject size isn't valid");
+#endif
 #endif
 }  // namespace rtld

@@ -9,6 +9,7 @@ $(LIB_COMPILER_RT_BUILTINS): $(BUILD_DIR)/compiler-rt/Makefile
 
 $(BUILD_DIR)/compiler-rt/Makefile: $(DIST_NEWLIB) $(DIST_TRANSISTOR_SUPPORT)
 	mkdir -p $(@D)
+	echo $(CC_FLAGS)
 	cd $(@D); cmake -G "Unix Makefiles" $(realpath $(SOURCE_ROOT))/compiler-rt \
 		-DCOMPILER_RT_BAREMETAL_BUILD=ON \
 		-DCOMPILER_RT_STANDALONE_BUILD=ON \
@@ -22,6 +23,7 @@ $(BUILD_DIR)/compiler-rt/Makefile: $(DIST_NEWLIB) $(DIST_TRANSISTOR_SUPPORT)
 		-DCMAKE_C_COMPILER_TARGET="$(TARGET_TRIPLET)" \
 		-DCMAKE_CXX_COMPILER="$(CXX)" \
 		-DCMAKE_CXX_FLAGS="$(CC_FLAGS)" \
+		-DCMAKE_ASM_FLAGS="$(CC_FLAGS)" \
 		-DCMAKE_CXX_COMPILER_TARGET="$(TARGET_TRIPLET)" \
 		-DCMAKE_AR="$(AR)" \
 		-DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \

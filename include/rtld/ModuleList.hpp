@@ -48,6 +48,10 @@ struct ModuleObjectList {
     };
 };
 
+#ifdef __aarch64__
 static_assert(sizeof(ModuleObjectList) == 0x10, "ModuleObjectList isn't valid");
+#elif __arm__
+static_assert(sizeof(ModuleObjectList) == 0x8, "ModuleObjectList isn't valid");
+#endif
 
 }  // namespace rtld
