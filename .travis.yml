@@ -26,12 +26,10 @@ script:
   - make LINKLE=./linkle
 
 after_success:
-  - if [[ "${TRAVIS_TAG}" != "" ]] && [[ "${TRAVIS_PULL_REQUEST}" = "false" ]]; then
-      mv rtld-aarch64.nso rtld-aarch64-$TRAVIS_TAG.nso
-      mv rtld-aarch64-6xx.nso rtld-aarch64-6xx-$TRAVIS_TAG.nso
-      mv rtld-armv7.nso rtld-armv7-$TRAVIS_TAG.nso
-      mv rtld-armv7-6xx.nso rtld-armv7-6xx-$TRAVIS_TAG.nso
-    fi
+  - mv rtld-aarch64.nso rtld-aarch64-$TRAVIS_TAG.nso
+  - mv rtld-aarch64-6xx.nso rtld-aarch64-6xx-$TRAVIS_TAG.nso
+  - mv rtld-armv7.nso rtld-armv7-$TRAVIS_TAG.nso
+  - mv rtld-armv7-6xx.nso rtld-armv7-6xx-$TRAVIS_TAG.nso
 
 deploy:
   - provider: releases
