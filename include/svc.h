@@ -29,7 +29,7 @@ Result svcQueryMemory(memory_info_t *memory_info_ptr, uint32_t *pageinfo,
 
 void svcExitProcess(void);
 
-Result svcBreak(uint32_t breakReason, uint64_t unk, uint64_t info);
+Result svcBreak(uint32_t breakReason, size_t unk, size_t info);
 
 void svcReturnFromException(Result errorCode);
 

@@ -1,7 +1,7 @@
 .section ".rodata.application_name"
 .word 0
 .word 8
-.ascii "oss-rtld"
+.ascii "oss-rtld\0"
 
 .section ".rodata.mod0"
 .global __nx_mod0

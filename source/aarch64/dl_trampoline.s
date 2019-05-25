@@ -12,7 +12,7 @@ __rtld_runtime_resolve:
     [sp, #0]          &PLTGOT[n]
 
     What we need:
-    x0 = calling module (ip0[-2])
+    x0 = calling module (ip0[-1])
     x1 = .rel.plt index ((ip1 - ip0 - 8) / 8)
     */
     ldr x17, [sp]

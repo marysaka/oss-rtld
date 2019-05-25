@@ -1,0 +1,7 @@
+ARCH := armv7
+COMPILER_RT_ARCH := armhf
+TARGET_TRIPLET = armv7l-none-linux-gnueabihf
+AS_ARCH := -arch=arm -triple=$(TARGET_TRIPLET) -mattr=+v7,+vfp2
+CC_ARCH := -march=armv7-a -mfloat-abi=hard
+
+include mk/common.mk

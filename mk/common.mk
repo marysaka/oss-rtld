@@ -57,7 +57,6 @@ LD_FLAGS := \
             --build-id=sha1 \
             -L$(LIB_COMPILER_RT_PATH) \
             -lclang_rt.builtins-$(COMPILER_RT_ARCH) \
-            --reproduce $(SOURCE_ROOT)/reproduce.tar
 
 # 
 # for compatiblity
