@@ -101,7 +101,7 @@ clean: clean_compiler-rt
 	rm -rf $(OBJECTS_NORMAL) $(OBJECTS_6XX) $(BUILD_DIR)/$(NAME).elf $(BUILD_DIR_6XX)/$(NAME).elf $(NAME).nso $(NAME)-6xx.nso
 
 $(BUILD_DIR):
-	@mkdir $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
 
 $(BUILD_DIR)/%.o: %.s
 	$(AS) $(AS_FLAGS) -filetype=obj -o $@ $<
@@ -120,7 +120,7 @@ $(NAME).nso: $(BUILD_DIR)/$(NAME).elf
 
 # 6.x+ build definition
 $(BUILD_DIR_6XX):
-	@mkdir $(BUILD_DIR_6XX)
+	@mkdir -p $(BUILD_DIR_6XX)
 
 $(BUILD_DIR_6XX)/%.o: %.s
 	$(AS) $(AS_FLAGS) -filetype=obj -o $@ $<
