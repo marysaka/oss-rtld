@@ -31,9 +31,10 @@ RANLIB := $(LLVM_BINDIR)/llvm-ranlib
 SOURCE_ROOT = .
 SRC_DIR = $(SOURCE_ROOT)/source $(SOURCE_ROOT)/source/$(ARCH)
 BUILD_DIR := $(SOURCE_ROOT)/build/$(ARCH)
+BUILD_DIR_6XX := $(SOURCE_ROOT)/build/$(ARCH)-6xx
 LINK_SCRIPT = link.T
 
-export VPATH := $(foreach dir,$(SRC_DIR),$(CURDIR)/$(dir)) $(BUILD_DIR)
+export VPATH := $(foreach dir,$(SRC_DIR),$(CURDIR)/$(dir))
 
 # For compiler-rt, we need some system header
 SYS_INCLUDES := -isystem $(realpath $(SOURCE_ROOT))/include/ -isystem $(realpath $(SOURCE_ROOT))/misc/$(ARCH) -isystem $(realpath $(SOURCE_ROOT))/misc/system/include
@@ -41,6 +42,9 @@ CC_FLAGS := -fuse-ld=lld -fno-stack-protector -target $(TARGET_TRIPLET) $(CC_ARC
 CXX_FLAGS := $(CC_FLAGS) -std=c++17 -stdlib=libc++ -nodefaultlibs -nostdinc++ -fno-rtti -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables
 AR_FLAGS := rcs
 AS_FLAGS := $(AS_ARCH)
+
+# Used to build 6.x+ rtld
+DEFINE_6XX := -D__RTLD_6XX__
 
 # required compiler-rt definitions
 LIB_COMPILER_RT_PATH := $(BUILD_DIR)/compiler-rt/build/$(ARCH)/lib
@@ -82,7 +86,7 @@ export TARGET_TRIPLET
 
 NAME = rtld-$(ARCH)
 
-all: $(NAME).nso
+all: $(NAME).nso $(NAME)-6xx.nso
 
 include mk/compiler-rt.mk
 
@@ -90,7 +94,14 @@ CFILES   := $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES := $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.cpp)))
 ASMFILES := $(foreach dir,$(SRC_DIR),$(notdir $(wildcard $(dir)/*.s)))
 
-OBJECTS = $(LIB_COMPILER_RT_BUILTINS) $(addprefix $(BUILD_DIR)/, $(CFILES:.c=.o) $(CPPFILES:.cpp=.o) $(ASMFILES:.s=.o))
+OBJECTS_NORMAL = $(LIB_COMPILER_RT_BUILTINS) $(addprefix $(BUILD_DIR)/, $(CFILES:.c=.o) $(CPPFILES:.cpp=.o) $(ASMFILES:.s=.o))
+OBJECTS_6XX = $(LIB_COMPILER_RT_BUILTINS) $(addprefix $(BUILD_DIR_6XX)/, $(CFILES:.c=.o) $(CPPFILES:.cpp=.o) $(ASMFILES:.s=.o))
+
+clean: clean_compiler-rt
+	rm -rf $(OBJECTS_NORMAL) $(OBJECTS_6XX) $(BUILD_DIR)/$(NAME).elf $(BUILD_DIR_6XX)/$(NAME).elf $(NAME).nso $(NAME)-6xx.nso
+
+$(BUILD_DIR):
+	@mkdir $(BUILD_DIR)
 
 $(BUILD_DIR)/%.o: %.s
 	$(AS) $(AS_FLAGS) -filetype=obj -o $@ $<
@@ -101,11 +112,27 @@ $(BUILD_DIR)/%.o: %.c
 $(BUILD_DIR)/%.o: %.cpp
 	$(CXX) $(CXX_FLAGS) -o $@ -c $<
 
-$(BUILD_DIR)/$(NAME).elf: $(OBJECTS)
-	$(LD) $(LD_FLAGS) -o $@ $(OBJECTS)
+$(BUILD_DIR)/$(NAME).elf: $(BUILD_DIR) $(OBJECTS_NORMAL)
+	$(LD) $(LD_FLAGS) -o $@ $(OBJECTS_NORMAL)
 
-%.nso: $(BUILD_DIR)/%.elf
+$(NAME).nso: $(BUILD_DIR)/$(NAME).elf
 	$(LINKLE) nso $< $@
 
-clean: clean_compiler-rt
-	rm -rf $(OBJECTS) $(BUILD_DIR)/$(NAME).elf $(NAME).nso
+# 6.x+ build definition
+$(BUILD_DIR_6XX):
+	@mkdir $(BUILD_DIR_6XX)
+
+$(BUILD_DIR_6XX)/%.o: %.s
+	$(AS) $(AS_FLAGS) -filetype=obj -o $@ $<
+
+$(BUILD_DIR_6XX)/%.o: %.c
+	$(CC) $(CC_FLAGS) $(DEFINE_6XX) -o $@ -c $<
+
+$(BUILD_DIR_6XX)/%.o: %.cpp
+	$(CXX) $(CXX_FLAGS) $(DEFINE_6XX) -o $@ -c $<
+
+$(BUILD_DIR_6XX)/$(NAME).elf: $(BUILD_DIR_6XX) $(OBJECTS_6XX)
+	$(LD) $(LD_FLAGS) -o $@ $(OBJECTS_6XX)
+
+$(NAME)-6xx.nso: $(BUILD_DIR_6XX)/$(NAME).elf
+	$(LINKLE) nso $< $@
