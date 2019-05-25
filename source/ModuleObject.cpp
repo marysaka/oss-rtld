@@ -164,7 +164,7 @@ void ModuleObject::Initialize(char *aslr_base, Elf_Dyn *dynamic) {
 }
 
 void ModuleObject::Relocate() {
-    if (this->rela_count) {
+    if (this->rel_count) {
         for (auto i = 0u; i < this->rel_count; i++) {
             Elf_Rel *entry = &this->rela_or_rel.rel[i];
             switch (ELF_R_TYPE(entry->r_info)) {

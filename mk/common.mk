@@ -37,7 +37,7 @@ export VPATH := $(foreach dir,$(SRC_DIR),$(CURDIR)/$(dir)) $(BUILD_DIR)
 
 # For compiler-rt, we need some system header
 SYS_INCLUDES := -isystem $(realpath $(SOURCE_ROOT))/include/ -isystem $(realpath $(SOURCE_ROOT))/misc/$(ARCH) -isystem $(realpath $(SOURCE_ROOT))/misc/system/include
-CC_FLAGS := -fuse-ld=lld -fno-stack-protector -target $(TARGET_TRIPLET) $(CC_ARCH) -fPIC -nostdlib -nostdlibinc $(SYS_INCLUDES) -Wno-unused-command-line-argument -Wall -Wextra -O2 -ffunction-sections -fdata-sections -D__RTLD_6XX__
+CC_FLAGS := -fuse-ld=lld -fno-stack-protector -target $(TARGET_TRIPLET) $(CC_ARCH) -fPIC -nostdlib -nostdlibinc $(SYS_INCLUDES) -Wno-unused-command-line-argument -Wall -Wextra -O2 -ffunction-sections -fdata-sections
 CXX_FLAGS := $(CC_FLAGS) -std=c++17 -stdlib=libc++ -nodefaultlibs -nostdinc++ -fno-rtti -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables
 AR_FLAGS := rcs
 AS_FLAGS := $(AS_ARCH)

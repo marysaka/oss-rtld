@@ -19,7 +19,7 @@ void WEAK Start(unsigned long thread_handle, unsigned long argument_address,
 }  // namespace nn
 
 extern "C" void __nnDetailInitLibc0(void);
-extern "C" void nnosInitialize(unsigned long thread_handle,
+extern "C" void nnosInitialize(Handle thread_handle,
                                unsigned long argument_address);
 extern "C" void __nnDetailInitLibc1(void);
 extern "C" void __nnDetailInitLibc2(void);

@@ -8,7 +8,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-typedef uint64_t Result;
+typedef size_t Result;
+typedef uint32_t Handle;
 
 typedef struct {
     uint64_t address;
@@ -24,7 +25,7 @@ typedef struct {
 _Static_assert(sizeof(memory_info_t) == 0x28, "memory_info_t size isn't valid");
 
 Result svcQueryMemory(memory_info_t *memory_info_ptr, uint32_t *pageinfo,
-                      uint64_t addr);
+                      uintptr_t addr);
 
 void svcExitProcess(void);
 
