@@ -92,10 +92,10 @@ $(BUILD_DIR_6XX)/%.o: %.c
 $(BUILD_DIR_6XX)/%.o: %.cpp
 	$(CXX) $(CXX_FLAGS) $(DEFINE_6XX) -o $@ -c $<
 
-$(NAME).a: $(BUILD_DIR) $(OBJECTS_NORMAL)
+$(SOURCE_ROOT)/$(NAME).a: $(BUILD_DIR) $(OBJECTS_NORMAL)
 	@rm -f $@
 	$(AR) -rc $@ $(OBJECTS_NORMAL)
 
-$(NAME)-6xx.a: $(BUILD_DIR_6XX) $(OBJECTS_6XX)
+$(SOURCE_ROOT)/$(NAME)-6xx.a: $(BUILD_DIR_6XX) $(OBJECTS_6XX)
 	@rm -f $@
 	$(AR) -rc $@ $(OBJECTS_6XX)

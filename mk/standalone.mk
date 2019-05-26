@@ -1,4 +1,5 @@
 SOURCE_ROOT = $(CURDIR)
+LIB_ROOT = $(SOURCE_ROOT)/lib$(BASE_NAME)/
 BASE_NAME = rtld
 NAME = $(BASE_NAME)-$(ARCH)
 SRC_DIR =
@@ -12,10 +13,10 @@ LINKLE = linkle
 all: $(NAME).nso $(NAME)-6xx.nso
 
 lib$(BASE_NAME)/lib$(NAME).a:
-	make -C lib$(BASE_NAME) -f Makefile.$(ARCH) lib$(NAME).a
+	make -C lib$(BASE_NAME) -f Makefile.$(ARCH) $(LIB_ROOT)/lib$(NAME).a
 
 lib$(BASE_NAME)/lib$(NAME)-6xx.a:
-	make -C lib$(BASE_NAME) -f Makefile.$(ARCH) lib$(NAME)-6xx.a
+	make -C lib$(BASE_NAME) -f Makefile.$(ARCH) $(LIB_ROOT)/lib$(NAME)-6xx.a
 
 clean-lib$(BASE_NAME):
 	make -C lib$(BASE_NAME) -f Makefile.$(ARCH) clean
