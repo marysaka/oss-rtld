@@ -142,17 +142,16 @@ LD_FLAGS := \
             --build-id=sha1 \
             -L$(LIB_COMPILER_RT_PATH) \
             -lclang_rt.builtins-$(COMPILER_RT_ARCH) \
-            -L$(SOURCE_ROOT)/lib$(BASE_NAME) \
-            -l$(NAME)
+            -L$(SOURCE_ROOT)/lib$(BASE_NAME)
 
 $(BUILD_DIR_6XX)/$(NAME).elf: $(BUILD_DIR_6XX) $(OBJECTS_6XX) $(LIB_COMPILER_RT_BUILTINS) lib$(BASE_NAME)/lib$(NAME)-6xx.a
-	$(LD) $(LD_FLAGS) -o $@ $(OBJECTS_6XX)
+	$(LD) $(LD_FLAGS) -l$(NAME)-6xx -o $@ $(OBJECTS_6XX)
 
 $(NAME)-6xx.nso: $(BUILD_DIR_6XX)/$(NAME).elf
 	$(LINKLE) nso $< $@
 
 $(BUILD_DIR)/$(NAME).elf: $(BUILD_DIR) $(OBJECTS_NORMAL) $(LIB_COMPILER_RT_BUILTINS) lib$(BASE_NAME)/lib$(NAME).a
-	$(LD) $(LD_FLAGS) -o $@ $(OBJECTS_NORMAL)
+	$(LD) $(LD_FLAGS) -l$(NAME) -o $@ $(OBJECTS_NORMAL)
 
 $(NAME).nso: $(BUILD_DIR)/$(NAME).elf
 	echo $(CURDIR)
