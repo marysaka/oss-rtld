@@ -5,4 +5,4 @@ TARGET_TRIPLET = aarch64-none-linux-gnu
 AS_ARCH := -arch=$(ARCH)
 CC_ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57
 
-include mk/standalone.mk
+include mk/library.mk

@@ -23,7 +23,9 @@ extern "C" void __rtld_start_app(Handle thread_handle,
         nninitStartup();
 
         __nnDetailInitLibc2();
+
         call_initializator();
+
         nnMain();
 
         if (nninitFinalizeSdkModule) nninitFinalizeSdkModule();
@@ -35,4 +37,14 @@ extern "C" void __rtld_start_app(Handle thread_handle,
         nn::init::Start(thread_handle, argument_address,
                         notify_exception_handler_ready, call_initializator);
     }
+}
+
+extern "C" void __rtld_handle_exception() {
+    if (!nn::os::detail::UserExceptionHandler) {
+        svcReturnFromException(0xF801);
+        while (true) {
+        }
+    }
+
+    nn::os::detail::UserExceptionHandler();
 }

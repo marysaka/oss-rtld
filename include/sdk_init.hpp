@@ -1,6 +1,11 @@
 #pragma once
 
-#include "utils.hpp"
+#include <stdint.h>
+#include <rtld.hpp>
+
+#ifndef WEAK
+#define WEAK __attribute__((weak))
+#endif
 
 namespace nn {
 namespace os {
