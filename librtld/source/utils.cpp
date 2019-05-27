@@ -1,5 +1,5 @@
-#include "rtld.hpp"
 #include "utils.hpp"
+#include "rtld.hpp"
 
 // TODO: provide better implmentations of those functions.
 extern "C" WEAK void *memset(void *s, int c, size_t n) {
@@ -8,7 +8,7 @@ extern "C" WEAK void *memset(void *s, int c, size_t n) {
     return s;
 }
 
-extern "C"  size_t __rtld_strlen(const char *s) {
+extern "C" size_t __rtld_strlen(const char *s) {
     size_t res = 0;
 
     while (*s) {
@@ -19,7 +19,7 @@ extern "C"  size_t __rtld_strlen(const char *s) {
     return res;
 }
 
-extern "C"  int __rtld_strcmp(const char *s1, const char *s2) {
+extern "C" int __rtld_strcmp(const char *s1, const char *s2) {
     while (*s1 && (*s1 == *s2)) {
         s1++;
         s2++;

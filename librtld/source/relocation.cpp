@@ -124,12 +124,12 @@ extern "C" void __rtld_relocate_modules(char *aslr_base, Elf_Dyn *dynamic) {
     g_pAutoLoadList.front = next_module;
 
     uint64_t last_address = 0;
-    memory_info_t memory_info;
+    svc::MemoryInfo memory_info;
     uint32_t dummy;
 
     bool is_past_last_address;
     do {
-        Result res = svcQueryMemory(&memory_info, &dummy, last_address);
+        Result res = svc::QueryMemory(&memory_info, &dummy, last_address);
         if (res) {
             while (true) {
             }

@@ -84,14 +84,14 @@ void ModuleObject::Initialize(char *aslr_base, Elf_Dyn *dynamic) {
 
             case DT_RELAENT: {
                 if (dynamic->d_un.d_val != sizeof(Elf_Rela)) {
-                    svcBreak(0, 0, 0);
+                    svc::Break(0, 0, 0);
                 }
                 break;
             }
 
             case DT_SYMENT: {
                 if (dynamic->d_un.d_val != sizeof(Elf_Sym)) {
-                    svcBreak(0, 0, 0);
+                    svc::Break(0, 0, 0);
                 }
                 break;
             }
@@ -118,7 +118,7 @@ void ModuleObject::Initialize(char *aslr_base, Elf_Dyn *dynamic) {
 
             case DT_RELENT: {
                 if (dynamic->d_un.d_val != sizeof(Elf_Rel)) {
-                    svcBreak(0, 0, 0);
+                    svc::Break(0, 0, 0);
                 }
                 break;
             }
@@ -127,7 +127,7 @@ void ModuleObject::Initialize(char *aslr_base, Elf_Dyn *dynamic) {
                 Elf_Xword value = dynamic->d_un.d_val;
                 this->is_rela = value == DT_RELA;
                 if (value != DT_REL && value != DT_RELA) {
-                    svcBreak(0, 0, 0);
+                    svc::Break(0, 0, 0);
                 }
                 break;
             }
@@ -290,7 +290,7 @@ void ModuleObject::ResolveSymbolRelJumpSlot(Elf_Rel *entry,
 
         if (this->got_stub_ptr) {
             if (this->got_stub_ptr != (void *)target_address) {
-                svcBreak(0, 0, 0);
+                svc::Break(0, 0, 0);
             }
         } else {
             this->got_stub_ptr = (void *)target_address;
@@ -327,7 +327,7 @@ void ModuleObject::ResolveSymbolRelaJumpSlot(Elf_Rela *entry,
 
         if (this->got_stub_ptr) {
             if (this->got_stub_ptr != (void *)target_address) {
-                svcBreak(0, 0, 0);
+                svc::Break(0, 0, 0);
             }
         } else {
             this->got_stub_ptr = (void *)target_address;

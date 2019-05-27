@@ -1,7 +1,6 @@
 # TODO
 
 ## Near-term
-- Code clean up.
 - Document everything.
 
 ## Middle-term

@@ -31,7 +31,7 @@ extern "C" void __rtld_start_app(Handle thread_handle,
         if (nninitFinalizeSdkModule) nninitFinalizeSdkModule();
 
         nnosQuickExit();
-        svcExitProcess();
+        rtld::svc::ExitProcess();
 
     } else {
         nn::init::Start(thread_handle, argument_address,
@@ -41,7 +41,7 @@ extern "C" void __rtld_start_app(Handle thread_handle,
 
 extern "C" void __rtld_handle_exception() {
     if (!nn::os::detail::UserExceptionHandler) {
-        svcReturnFromException(0xF801);
+        rtld::svc::ReturnFromException(0xF801);
         while (true) {
         }
     }

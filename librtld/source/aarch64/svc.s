@@ -14,7 +14,7 @@
     .cfi_endproc
 .endm
 
-SVC_BEGIN svcQueryMemory
+SVC_BEGIN _ZN4rtld3svc11QueryMemoryEPNS0_10MemoryInfoEPjm
     str x1, [sp, #-16]!
     svc 0x6
     ldr x2, [sp], #16
@@ -22,22 +22,22 @@ SVC_BEGIN svcQueryMemory
     ret
 SVC_END
 
-SVC_BEGIN svcExitProcess
+SVC_BEGIN _ZN4rtld3svc11ExitProcessEv
     svc 0x7
     ret
 SVC_END
 
-SVC_BEGIN svcBreak
+SVC_BEGIN _ZN4rtld3svc5BreakEjmm
     svc 0x26
     ret
 SVC_END
 
-SVC_BEGIN svcOutputDebugString
+SVC_BEGIN _ZN4rtld3svc17OutputDebugStringEPKcm
     svc 0x27
     ret
 SVC_END
 
-SVC_BEGIN svcReturnFromException
+SVC_BEGIN _ZN4rtld3svc19ReturnFromExceptionEm
     svc 0x28
     ret
 SVC_END

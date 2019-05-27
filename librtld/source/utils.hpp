@@ -10,7 +10,7 @@ extern "C" int __rtld_strcmp(const char *s1, const char *s2);
 extern "C" unsigned long __rtld_elf_hash(const char *name);
 
 inline void debug_print(const char *str) {
-    svcOutputDebugString(str, __rtld_strlen(str));
+    svc::OutputDebugString(str, __rtld_strlen(str));
 }
 
 inline void print_unresolved_symbol(const char *name) {
@@ -18,4 +18,3 @@ inline void print_unresolved_symbol(const char *name) {
     debug_print(name);
     debug_print("'\n");
 }
-

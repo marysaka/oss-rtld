@@ -7,7 +7,8 @@
 #include "rtld/ModuleHeader.hpp"
 #include "rtld/ModuleList.hpp"
 #include "rtld/ModuleObject.hpp"
-#include "svc.h"
+#include "rtld/svc.hpp"
+#include "rtld/types.hpp"
 
 using namespace rtld;
 
