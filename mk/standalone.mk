@@ -135,7 +135,7 @@ LD_FLAGS := \
             --version-script=$(SOURCE_ROOT)/exported.txt \
             --shared \
             --gc-sections \
-            -T $(SOURCE_ROOT)/lib$(BASE_NAME)/misc/$(ARCH)/rtld.ld \
+            -T $(SOURCE_ROOT)/misc/$(ARCH)/application.ld \
             -init=__rtld_init \
             -fini=__rtld_fini \
             -z text \
