@@ -8,6 +8,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
+// TODO: move everything here inside rtld namespace to avoid conflicts
+
 typedef size_t Result;
 typedef uint32_t Handle;
 

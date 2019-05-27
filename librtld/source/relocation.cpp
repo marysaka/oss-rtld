@@ -1,4 +1,5 @@
 #include "rtld.hpp"
+#include "utils.hpp"
 
 namespace rtld {
 ModuleObjectList g_pManualLoadList;

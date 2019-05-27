@@ -1,4 +1,5 @@
 #include "rtld.hpp"
+#include "utils.hpp"
 
 namespace rtld {
 
@@ -194,7 +195,7 @@ void ModuleObject::Relocate() {
 }
 
 Elf_Sym *ModuleObject::GetSymbolByName(const char *name) {
-    unsigned long name_hash = elf_hash(name);
+    unsigned long name_hash = __rtld_elf_hash(name);
 
     for (uint32_t i = this->hash_bucket[name_hash % this->hash_nbucket_value];
          i; i = this->hash_chain[i]) {
@@ -202,7 +203,7 @@ Elf_Sym *ModuleObject::GetSymbolByName(const char *name) {
                              ? this->dynsym[i].st_shndx == SHN_COMMON
                              : true;
         if (!is_common &&
-            strcmp(name, this->dynstr + this->dynsym[i].st_name) == 0) {
+            __rtld_strcmp(name, this->dynstr + this->dynsym[i].st_name) == 0) {
             return &this->dynsym[i];
         }
     }

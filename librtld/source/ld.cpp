@@ -1,4 +1,5 @@
 #include "rtld.hpp"
+#include "utils.hpp"
 
 Elf_Addr rtld::lookup_global_auto(const char *name) {
     if (g_pAutoLoadList.back == (ModuleObject *)&g_pAutoLoadList) {

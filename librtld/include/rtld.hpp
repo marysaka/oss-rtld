@@ -8,7 +8,6 @@
 #include "rtld/ModuleList.hpp"
 #include "rtld/ModuleObject.hpp"
 #include "svc.h"
-#include "utils.hpp"
 
 using namespace rtld;
 
