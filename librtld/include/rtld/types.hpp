@@ -2,5 +2,5 @@
 
 namespace rtld {
 typedef size_t Result;
-typedef uintptr_t Handle;
+typedef uint32_t Handle;
 }  // namespace rtld
