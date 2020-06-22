@@ -16,7 +16,7 @@ void WEAK UserExceptionHandler(void);
 }  // namespace os
 
 namespace init {
-void WEAK Start(Handle thread_handle, uintptr_t argument_address,
+void WEAK Start(uintptr_t thread_handle, uintptr_t argument_address,
                 void (*notify_exception_handler_ready)(),
                 void (*call_initializator)());
 }
