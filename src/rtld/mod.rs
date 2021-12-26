@@ -117,9 +117,7 @@ impl Relocation for RelocationTableAddendEntry {
 
     #[inline(always)]
     fn compute_value(&self, value: *const u8) -> usize {
-        unsafe {
-            value.offset(self.addend) as usize
-        }
+        unsafe { value.offset(self.addend) as usize }
     }
 
     #[inline(always)]
@@ -493,15 +491,23 @@ impl ModuleRuntime {
                     }
                     DT_RELASZ => self.rela_dynamic_size = entry.value,
                     DT_RELAENT => {
-                        debug_assert!(entry.value == core::mem::size_of::<RelocationTableAddendEntry>())
+                        debug_assert!(
+                            entry.value == core::mem::size_of::<RelocationTableAddendEntry>()
+                        )
                     }
                     DT_STRSZ => self.dynamic_str_size = entry.value,
-                    DT_SYMENT => debug_assert!(entry.value == core::mem::size_of::<SymbolTableEntry>()),
+                    DT_SYMENT => {
+                        debug_assert!(entry.value == core::mem::size_of::<SymbolTableEntry>())
+                    }
                     DT_INIT => {
-                        self.dt_init = Some(*(&module_base.add(entry.value as usize) as *const _ as *const fn()))
+                        self.dt_init = Some(
+                            *(&module_base.add(entry.value as usize) as *const _ as *const fn()),
+                        )
                     }
                     DT_FINI => {
-                        self.dt_fini = Some(*(&module_base.add(entry.value as usize) as *const _ as *const fn()))
+                        self.dt_fini = Some(
+                            *(&module_base.add(entry.value as usize) as *const _ as *const fn()),
+                        )
                     }
                     // 6.x+, ignored before
                     DT_SONAME => self.soname_idx = entry.value as usize,
@@ -638,10 +644,10 @@ impl ModuleRuntime {
         if symbol.other.visibility() == SymbolVisibility::Default {
             for lookup_function in unsafe { LOOKUP_FUNCTIONS } {
                 if let Some(lookup_function) = lookup_function {
-                    let target_address =
-                        lookup_function(
-                            self as *const _ as *mut Self,
-                            string_table[symbol.name_offset as usize..].as_ptr());
+                    let target_address = lookup_function(
+                        self as *const _ as *mut Self,
+                        string_table[symbol.name_offset as usize..].as_ptr(),
+                    );
 
                     if target_address != 0 {
                         return Some(target_address);
@@ -934,7 +940,10 @@ pub unsafe fn parse_cstr<'a>(raw_name: *const u8) -> Option<&'a str> {
     }
 }
 
-pub extern "C" fn default_lookup_auto_list(_module: *mut ModuleRuntime, raw_name: *const u8) -> usize {
+pub extern "C" fn default_lookup_auto_list(
+    _module: *mut ModuleRuntime,
+    raw_name: *const u8,
+) -> usize {
     unsafe {
         if GLOBAL_LOAD_LIST.is_empty() {
             return 0;
@@ -1021,7 +1030,10 @@ pub unsafe fn call_finilizers() {
 }
 
 // TODO: Move to ModuleRuntime after refacto
-fn lazy_bind_resolve_internal<T>(module: &mut ModuleRuntime, index: usize) -> usize where T: Relocation {
+fn lazy_bind_resolve_internal<T>(module: &mut ModuleRuntime, index: usize) -> usize
+where
+    T: Relocation,
+{
     let procedure_linkage_table = unsafe {
         core::slice::from_raw_parts(
             module.procedure_linkage_table as *const T,
@@ -1038,7 +1050,7 @@ fn lazy_bind_resolve_internal<T>(module: &mut ModuleRuntime, index: usize) -> us
             return 0;
         }
 
-        return relocation.compute_value(target_address as *const u8)
+        return relocation.compute_value(target_address as *const u8);
     } else if RO_DEBUG_FLAG {
         write!(
             &mut crate::nx::KernelWritter,
@@ -1112,12 +1124,15 @@ pub unsafe extern "C" fn runtime_resolve() -> ! {
     )
 }
 
-pub fn get_exported_function<T>(name: &str) -> Option<T> where T: Sized + Copy {
+pub fn get_exported_function<T>(name: &str) -> Option<T>
+where
+    T: Sized + Copy,
+{
     for module_runtime in ModuleRuntimeIter::new(unsafe { &mut GLOBAL_LOAD_LIST.link }) {
         if let Some(symbol) = module_runtime.get_symbol_by_name(name) {
             if let Some(value) = module_runtime.resolve_symbol(&symbol) {
                 if value != 0 {
-                    return Some(unsafe { *(&value as *const usize as *const T) })
+                    return Some(unsafe { *(&value as *const usize as *const T) });
                 }
             }
         }

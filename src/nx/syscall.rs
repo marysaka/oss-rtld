@@ -109,10 +109,7 @@ pub unsafe fn query_memory(
 }
 
 pub unsafe fn exit_process() -> ! {
-    asm!(
-        "svc 0x7",
-        options(noreturn)
-    )
+    asm!("svc 0x7", options(noreturn))
 }
 
 pub unsafe fn break_(break_reason: BreakReason, address: usize, size: usize) {

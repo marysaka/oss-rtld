@@ -125,37 +125,74 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
             }
         }
 
-        type CustomStartFunc = extern fn(usize, *const c_void, unsafe fn(), unsafe fn(), unsafe fn());
-        type Sdk10StartFunc = extern fn(usize, *const c_void, unsafe fn(), unsafe fn(), unsafe fn());
-        type Sdk03StartFunc = extern fn(usize, *const c_void, unsafe fn(), unsafe fn());
+        type CustomStartFunc =
+            extern "C" fn(usize, *const c_void, unsafe fn(), unsafe fn(), unsafe fn());
+        type Sdk10StartFunc =
+            extern "C" fn(usize, *const c_void, unsafe fn(), unsafe fn(), unsafe fn());
+        type Sdk03StartFunc = extern "C" fn(usize, *const c_void, unsafe fn(), unsafe fn());
 
-        if let Some(init_function) = rtld::get_exported_function::<CustomStartFunc>("__rtld_custom_start") {
+        if let Some(init_function) =
+            rtld::get_exported_function::<CustomStartFunc>("__rtld_custom_start")
+        {
             // Custom initialization
-            init_function(thread_handle as usize, &__argdata__, notify_exception_handler_ready, rtld::call_initializers, rtld::call_finilizers);
-        }
-        else if let Some(init_function) = rtld::get_exported_function::<Sdk10StartFunc>("_ZN2nn4init5StartEmmPFvvES2_S2_") {
+            init_function(
+                thread_handle as usize,
+                &__argdata__,
+                notify_exception_handler_ready,
+                rtld::call_initializers,
+                rtld::call_finilizers,
+            );
+        } else if let Some(init_function) =
+            rtld::get_exported_function::<Sdk10StartFunc>("_ZN2nn4init5StartEmmPFvvES2_S2_")
+        {
             // ~10.x SDK initialization
-            init_function(thread_handle as usize, &__argdata__, notify_exception_handler_ready, rtld::call_initializers, rtld::call_finilizers);
-        } else if let Some(init_function) = rtld::get_exported_function::<Sdk03StartFunc>("_ZN2nn4init5StartEmmPFvvES2_") {
+            init_function(
+                thread_handle as usize,
+                &__argdata__,
+                notify_exception_handler_ready,
+                rtld::call_initializers,
+                rtld::call_finilizers,
+            );
+        } else if let Some(init_function) =
+            rtld::get_exported_function::<Sdk03StartFunc>("_ZN2nn4init5StartEmmPFvvES2_")
+        {
             // ~3.x SDK initialization
-            init_function(thread_handle as usize, &__argdata__, notify_exception_handler_ready, rtld::call_initializers);
+            init_function(
+                thread_handle as usize,
+                &__argdata__,
+                notify_exception_handler_ready,
+                rtld::call_initializers,
+            );
         } else {
             // In other cases, we assume SDK from before 3.x (brace yourself, this is hell)
 
-            let __nnDetailInitLibc0 = &rtld::get_exported_function::<extern fn()>("__nnDetailInitLibc0").unwrap();
-            let nnosInitialize = rtld::get_exported_function::<extern fn(usize, *const c_void)>("nnosInitialize").unwrap();
-            let __nnDetailInitLibc1 = rtld::get_exported_function::<extern fn()>("__nnDetailInitLibc1").unwrap();
-            let nndiagStartup = rtld::get_exported_function::<extern fn()>("nndiagStartup").unwrap();
+            let __nnDetailInitLibc0 =
+                &rtld::get_exported_function::<extern "C" fn()>("__nnDetailInitLibc0").unwrap();
+            let nnosInitialize =
+                rtld::get_exported_function::<extern "C" fn(usize, *const c_void)>(
+                    "nnosInitialize",
+                )
+                .unwrap();
+            let __nnDetailInitLibc1 =
+                rtld::get_exported_function::<extern "C" fn()>("__nnDetailInitLibc1").unwrap();
+            let nndiagStartup =
+                rtld::get_exported_function::<extern "C" fn()>("nndiagStartup").unwrap();
 
-            let nninitStartup = rtld::get_exported_function::<extern fn()>("nninitStartup").unwrap();
-            let __nnDetailInitLibc2 = rtld::get_exported_function::<extern fn()>("__nnDetailInitLibc1").unwrap();
-            let nnMain = rtld::get_exported_function::<extern fn()>("nnMain").unwrap();
-            let nnosQuickExit = rtld::get_exported_function::<extern fn()>("nnosQuickExit").unwrap();
+            let nninitStartup =
+                rtld::get_exported_function::<extern "C" fn()>("nninitStartup").unwrap();
+            let __nnDetailInitLibc2 =
+                rtld::get_exported_function::<extern "C" fn()>("__nnDetailInitLibc1").unwrap();
+            let nnMain = rtld::get_exported_function::<extern "C" fn()>("nnMain").unwrap();
+            let nnosQuickExit =
+                rtld::get_exported_function::<extern "C" fn()>("nnosQuickExit").unwrap();
 
             // Weak symbols
-            let nninitInitializeSdkModuleOption = rtld::get_exported_function::<extern fn()>("nninitInitializeSdkModule");
-            let nninitInitializeAbortObserverOption = rtld::get_exported_function::<extern fn()>("nninitInitializeAbortObserver");
-            let nninitFinalizeSdkModuleOption = rtld::get_exported_function::<extern fn()>("nninitFinalizeSdkModule");
+            let nninitInitializeSdkModuleOption =
+                rtld::get_exported_function::<extern "C" fn()>("nninitInitializeSdkModule");
+            let nninitInitializeAbortObserverOption =
+                rtld::get_exported_function::<extern "C" fn()>("nninitInitializeAbortObserver");
+            let nninitFinalizeSdkModuleOption =
+                rtld::get_exported_function::<extern "C" fn()>("nninitFinalizeSdkModule");
 
             __nnDetailInitLibc0();
             nnosInitialize(thread_handle as usize, &__argdata__);
