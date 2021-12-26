@@ -1,4 +1,3 @@
-use core::arch::global_asm;
 use core::fmt::Write;
 
 pub mod rt;
@@ -18,10 +17,6 @@ impl Write for KernelWritter {
         Ok(())
     }
 }
-
-// MISC: Setup module
-// TODO: Move to full Rust here.
-global_asm!(include_str!("header.s"));
 
 // MISC: Set application name
 #[repr(packed)]

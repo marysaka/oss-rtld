@@ -965,7 +965,11 @@ pub extern "C" fn default_lookup_auto_list(
 pub unsafe fn initialize(module_base: *mut u8) {
     MANUAL_LOAD_LIST.initialize();
     GLOBAL_LOAD_LIST.initialize();
-    SELF_MODULE_RUNTIME.initialize(module_base, &__nx_mod0);
+
+    let module_offset = *(module_base as *const u32).add(1) as usize;
+    let module: &Module = &*(module_base).add(module_offset).cast();
+
+    SELF_MODULE_RUNTIME.initialize(module_base, module);
 
     GLOBAL_LOAD_LIST.link(&mut SELF_MODULE_RUNTIME);
 }

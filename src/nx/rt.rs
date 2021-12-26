@@ -2,7 +2,7 @@ use core::arch::asm;
 use core::fmt::Write;
 use core::panic::PanicInfo;
 
-use crate::rtld::Module;
+use crate::rtld::{Module, SELF_MODULE_RUNTIME};
 
 use super::syscall::{break_, return_from_exception, BreakReason};
 
@@ -20,8 +20,9 @@ fn panic(panic_info: &PanicInfo<'_>) -> ! {
 extern "C" {
     static mut __bss_start__: u8;
     static mut __bss_end__: u8;
+    static mut __eh_frame_hdr_start__: u8;
+    static mut __eh_frame_hdr_end__: u8;
     static __dynamic_start__: u8;
-    static __nx_mod0: Module;
 }
 
 #[link_section = ".text.crt0"]
@@ -31,7 +32,13 @@ unsafe extern "C" fn __module_start() -> ! {
     asm!(
         "
         b {}
-        .word __nx_mod0 - __module_start
+        .word 8
+        .word 0x30444F4D
+        .word  __dynamic_start__      - __module_start + 8
+        .word  __bss_start__          - __module_start + 8
+        .word  __bss_end__            - __module_start + 8
+        .word  __eh_frame_hdr_start__ - __module_start + 8
+        .word  __eh_frame_hdr_end__   - __module_start + 8
         ",
         sym shim_entrypoint,
         options(noreturn),
