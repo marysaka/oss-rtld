@@ -1,4 +1,4 @@
-#![feature(asm, asm_sym, naked_functions, global_asm)]
+#![feature(asm_sym, naked_functions)]
 #![no_std]
 #![no_main]
 #![allow(dead_code)]

@@ -1,4 +1,5 @@
 use core::fmt::Write;
+use core::arch::global_asm;
 
 pub mod rt;
 pub mod syscall;

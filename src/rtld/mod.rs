@@ -1,3 +1,4 @@
+use core::arch::asm;
 use core::fmt::{Debug, Write};
 use core::{ffi::c_void, marker::PhantomData};
 use static_assertions::assert_eq_size;
