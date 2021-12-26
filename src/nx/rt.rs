@@ -23,6 +23,7 @@ extern "C" {
     static mut __eh_frame_hdr_start__: u8;
     static mut __eh_frame_hdr_end__: u8;
     static __dynamic_start__: u8;
+    static __module_runtime__: u8;
 }
 
 #[link_section = ".text.crt0"]
@@ -32,15 +33,26 @@ unsafe extern "C" fn __module_start() -> ! {
     asm!(
         "
         b {}
-        .word 8
-        .word 0x30444F4D
-        .word  __dynamic_start__      - __module_start + 8
-        .word  __bss_start__          - __module_start + 8
-        .word  __bss_end__            - __module_start + 8
-        .word  __eh_frame_hdr_start__ - __module_start + 8
-        .word  __eh_frame_hdr_end__   - __module_start + 8
+        .word __module_header - __module_start
         ",
         sym shim_entrypoint,
+        options(noreturn),
+    )
+}
+
+#[naked]
+#[no_mangle]
+unsafe extern "C" fn __module_header() -> ! {
+    asm!(
+        "
+        .word 0x30444F4D
+        .word  __dynamic_start__      - __module_header
+        .word  __bss_start__          - __module_header
+        .word  __bss_end__            - __module_header
+        .word  __eh_frame_hdr_start__ - __module_header
+        .word  __eh_frame_hdr_end__   - __module_header
+        .word  SELF_MODULE_RUNTIME    - __module_header
+        ",
         options(noreturn),
     )
 }
@@ -77,23 +89,20 @@ unsafe extern "C" fn entry_normal_shim() -> ! {
         // Relocate current module
         adrp x0, {3}
         add x0, x0, #:lo12:{3}
-        adrp x1, {4}
-        add x1, x1, #:lo12:{4}
-        bl {5}
+        bl {4}
 
         // Restore the thread handle
         adrp x0, {3}
         add x0, x0, #:lo12:{3}
         mov w1, w19
         // Now jump to main
-        bl {6}
+        bl {5}
         b .
         ",
         sym __bss_start__,
         sym __bss_end__,
         sym clean_bss,
         sym __module_start,
-        sym __dynamic_start__,
         sym crate::rtld::relocate_self,
         sym crate::main,
         options(noreturn),

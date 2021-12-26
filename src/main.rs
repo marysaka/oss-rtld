@@ -9,7 +9,7 @@ use crate::{
     nx::syscall::{MemoryInfo, MemoryState},
     rtld::{
         LookupFunction, Module, ModuleObjectList, ModuleRuntimeIter, GLOBAL_LOAD_LIST,
-        LOOKUP_FUNCTIONS, MANUAL_LOAD_LIST, RO_DEBUG_FLAG,
+        LOOKUP_FUNCTIONS, MANUAL_LOAD_LIST, RO_DEBUG_FLAG, SELF_MODULE_RUNTIME,
     },
 };
 
@@ -25,7 +25,7 @@ pub static mut EXCEPTION_HANDLER_READY: bool = false;
 #[allow(non_snake_case)]
 pub fn main(module_base: *mut u8, thread_handle: u32) {
     unsafe {
-        rtld::initialize(module_base);
+        rtld::initialize();
 
         let linker_module_base = module_base as u64;
 
@@ -49,9 +49,7 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
                 && memory_info.address != linker_module_base
             {
                 let module_base = memory_info.address as *mut u8;
-                let module_offset = (module_base as *const u32).add(1).read() as usize;
-
-                let module: &Module = &*(module_base).add(module_offset).cast();
+                let module: &Module = &*Module::get_module_by_module_base(module_base);
 
                 debug_assert!(module.is_valid());
 
@@ -60,7 +58,6 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
                 let module_runtime = module.get_module_runtime();
 
                 module_runtime.initialize(module_base, module);
-                module_runtime.relocate();
 
                 rtld::GLOBAL_LOAD_LIST.link(module_runtime);
             }
@@ -121,7 +118,11 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
             }
 
             for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link) {
-                module_runtime.resolve_symbols(true);
+                module_runtime.relocate(
+                    module_runtime.module_base == SELF_MODULE_RUNTIME.module_base,
+                    false,
+                );
+                module_runtime.resolve_symbols(false);
             }
         }
 

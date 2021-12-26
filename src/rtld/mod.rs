@@ -259,6 +259,7 @@ impl Module {
         &mut *(module_ptr.add(self.module_runtime_offset as usize) as *mut ModuleRuntime)
     }
 
+    #[inline(always)]
     pub unsafe fn clear_bss(&self) {
         let module_ptr = self as *const Module as *mut u8;
         let start_bss_ptr = module_ptr.add(self.bss_start_offset as usize);
@@ -268,6 +269,13 @@ impl Module {
             0,
             (self.bss_end_offset - self.bss_start_offset) as usize,
         );
+    }
+
+    #[inline(always)]
+    pub unsafe fn get_module_by_module_base(module_base: *const u8) -> *const Self {
+        let module_offset = (module_base as *const u32).add(1).read() as usize;
+
+        (module_base).add(module_offset) as *const Self
     }
 }
 
@@ -536,36 +544,67 @@ impl ModuleRuntime {
         }
     }
 
-    #[inline(always)]
-    fn relocate_entries<T>(module_base: *const u8, relocations: *const T, relocations_count: usize)
-    where
+    fn relocate_entries<T>(
+        &self,
+        got_relocation_offset: usize,
+        relocations_size: usize,
+        skip_relative: bool,
+        skip_got: bool,
+    ) where
         T: Relocation,
     {
-        let relocations = unsafe { core::slice::from_raw_parts(relocations, relocations_count) };
+        let mut relocations = unsafe {
+            core::slice::from_raw_parts(
+                self.relocations as *const T,
+                relocations_size / core::mem::size_of::<T>(),
+            )
+        };
+
+        if skip_relative {
+            relocations = &relocations[got_relocation_offset..];
+        }
 
         for relocation in relocations {
             let relocation_type = relocation.get_type();
 
-            if relocation_type == R_AARCH64_RELATIVE {
-                relocation.apply(module_base, module_base);
+            if !skip_relative && relocation_type == R_AARCH64_RELATIVE {
+                relocation.apply(self.module_base, self.module_base);
+            }
+            if !skip_got && is_arch_got_relocation_type(relocation_type) {
+                let symbol_index = relocation.get_symbol_index();
+                let symbol_to_resolve = unsafe { *self.dynamic_symbols.add(symbol_index) };
+
+                if let Some(target_address) = self.resolve_symbol(&symbol_to_resolve) {
+                    relocation.apply(self.module_base, target_address as *const u8);
+                } else if RO_DEBUG_FLAG {
+                    write!(&mut crate::nx::KernelWritter, "{:?}", relocations.len()).ok();
+                    write!(
+                        &mut crate::nx::KernelWritter,
+                        "[rtld] warning: unresolved symbol = '{:?}'",
+                        self.try_get_symbol_str(&symbol_to_resolve)
+                    )
+                    .ok();
+                }
             }
         }
     }
 
-    pub fn relocate(&mut self) {
+    pub fn relocate(&mut self, skip_relative: bool, skip_got: bool) {
         if self.rela_count != 0 {
-            Self::relocate_entries(
-                self.module_base,
-                self.relocations as *const RelocationTableAddendEntry,
+            self.relocate_entries::<RelocationTableAddendEntry>(
                 self.rela_count,
+                self.rela_dynamic_size,
+                skip_relative,
+                skip_got,
             );
         }
 
         if self.rel_count != 0 {
-            Self::relocate_entries(
-                self.module_base,
-                self.relocations as *const RelocationTableEntry,
+            self.relocate_entries::<RelocationTableEntry>(
                 self.rel_count,
+                self.rel_dynamic_size,
+                skip_relative,
+                skip_got,
             );
         }
     }
@@ -575,7 +614,6 @@ impl ModuleRuntime {
         core::slice::from_raw_parts(self.dynamic_str, self.dynamic_str_size)
     }
 
-    #[inline(always)]
     fn try_get_symbol_str(&self, symbol: &SymbolTableEntry) -> Option<&str> {
         let string_table = unsafe { self.get_string_table() };
 
@@ -674,39 +712,6 @@ impl ModuleRuntime {
     }
 
     #[inline(always)]
-    fn resolve_got_entries<T>(&self, dynamic_relocation_offset: usize, relocations_size: usize)
-    where
-        T: Relocation,
-    {
-        let relocations = unsafe {
-            core::slice::from_raw_parts(
-                self.relocations as *const T,
-                relocations_size / core::mem::size_of::<T>(),
-            )
-        };
-
-        for relocation in &relocations[dynamic_relocation_offset..] {
-            let relocation_type = relocation.get_type();
-
-            if is_arch_got_relocation_type(relocation_type) {
-                let symbol_index = relocation.get_symbol_index();
-                let symbol_to_resolve = unsafe { *self.dynamic_symbols.add(symbol_index) };
-
-                if let Some(target_address) = self.resolve_symbol(&symbol_to_resolve) {
-                    relocation.apply(self.module_base, target_address as *const u8);
-                } else if RO_DEBUG_FLAG {
-                    write!(
-                        &mut crate::nx::KernelWritter,
-                        "[rtld] warning: unresolved symbol = '{:?}'",
-                        self.try_get_symbol_str(&symbol_to_resolve)
-                    )
-                    .ok();
-                }
-            }
-        }
-    }
-
-    #[inline(always)]
     fn resolve_plt_entries<T>(&mut self, lazy_init: bool)
     where
         T: Relocation,
@@ -765,12 +770,6 @@ impl ModuleRuntime {
     }
 
     pub fn resolve_symbols(&mut self, lazy_init: bool) {
-        self.resolve_got_entries::<RelocationTableEntry>(self.rel_count, self.rel_dynamic_size);
-        self.resolve_got_entries::<RelocationTableAddendEntry>(
-            self.rela_count,
-            self.rela_dynamic_size,
-        );
-
         if self.is_rela {
             self.resolve_plt_entries::<RelocationTableAddendEntry>(lazy_init);
         } else {
@@ -787,6 +786,7 @@ impl ModuleRuntime {
         }
     }
 
+    #[inline(always)]
     pub unsafe fn get_symbol_value(&self, symbol: &SymbolTableEntry) -> *mut *const c_void {
         self.module_base.add(symbol.value) as *mut _
     }
@@ -962,59 +962,19 @@ pub extern "C" fn default_lookup_auto_list(
 }
 
 #[inline(always)]
-pub unsafe fn initialize(module_base: *mut u8) {
+pub unsafe fn initialize() {
     MANUAL_LOAD_LIST.initialize();
     GLOBAL_LOAD_LIST.initialize();
-
-    let module_offset = *(module_base as *const u32).add(1) as usize;
-    let module: &Module = &*(module_base).add(module_offset).cast();
-
-    SELF_MODULE_RUNTIME.initialize(module_base, module);
 
     GLOBAL_LOAD_LIST.link(&mut SELF_MODULE_RUNTIME);
 }
 
-pub fn relocate_self(base_address: *mut u8, dynamic: *mut DynamicTableEntry) {
-    let mut rela_offset = None;
-    let mut rela_entry_size = 0;
-    let mut rela_count = 0;
+pub fn relocate_self(module_base: *mut u8) {
+    let module: &Module = unsafe { &*Module::get_module_by_module_base(module_base) };
+    let module_runtime = unsafe { module.get_module_runtime() };
 
-    let mut rel_offset = None;
-    let mut rel_entry_size = 0;
-    let mut rel_count = 0;
-
-    for entry in DynamicTableItererator::new(dynamic) {
-        match entry.tag {
-            DT_RELA => rela_offset = Some(entry.value),
-            DT_RELAENT => rela_entry_size = entry.value,
-            DT_REL => rel_offset = Some(entry.value),
-            DT_RELENT => rel_entry_size = entry.value,
-            DT_RELACOUNT => rela_count = entry.value,
-            DT_RELCOUNT => rel_count = entry.value,
-            _ => {}
-        }
-    }
-
-    if let Some(rela_offset) = rela_offset {
-        if rela_entry_size != core::mem::size_of::<RelocationTableAddendEntry>() {
-            loop {}
-        }
-
-        let relocations =
-            unsafe { base_address.add(rela_offset) as *const RelocationTableAddendEntry };
-
-        ModuleRuntime::relocate_entries(base_address, relocations, rela_count);
-    }
-
-    if let Some(rel_offset) = rel_offset {
-        if rel_entry_size != core::mem::size_of::<RelocationTableEntry>() {
-            loop {}
-        }
-
-        let relocations = unsafe { base_address.add(rel_offset) as *const RelocationTableEntry };
-
-        ModuleRuntime::relocate_entries(base_address, relocations, rel_count);
-    }
+    module_runtime.initialize(module_base, module);
+    module_runtime.relocate(false, true);
 }
 
 pub unsafe fn call_initializers() {

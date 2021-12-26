@@ -1,0 +1,4 @@
+{
+    "rust-analyzer.cargo.target": "aarch64-none-elf.json",
+    "rust-analyzer.checkOnSave.allTargets": false,
+}
