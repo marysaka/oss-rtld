@@ -21,6 +21,7 @@
     "target-endian": "little",
     "target-pointer-width": "64",
     "exe-suffix": ".elf",
+    "dynamic-linking": true,
     "trap-unreachable": true,
     "emit-debug-gdb-scripts": true,
     "requires-uwtable": true

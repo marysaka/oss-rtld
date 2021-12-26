@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 
 use core::ffi::c_void;
-use core::fmt::Write;
 
 use crate::{
     nx::syscall::{MemoryInfo, MemoryState},
@@ -126,8 +125,6 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
             }
         }
 
-        write!(&mut nx::KernelWritter, "{:p}", &__argdata__).ok();
-
         type CustomStartFunc = extern fn(usize, *const c_void, unsafe fn(), unsafe fn(), unsafe fn());
         type Sdk10StartFunc = extern fn(usize, *const c_void, unsafe fn(), unsafe fn(), unsafe fn());
         type Sdk03StartFunc = extern fn(usize, *const c_void, unsafe fn(), unsafe fn());
@@ -192,6 +189,5 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
 }
 
 unsafe fn notify_exception_handler_ready() {
-    write!(&mut nx::KernelWritter, "notify_exception_handler_ready").ok();
     EXCEPTION_HANDLER_READY = true;
 }

@@ -1004,23 +1004,19 @@ pub fn relocate_self(base_address: *mut u8, dynamic: *mut DynamicTableEntry) {
 }
 
 pub unsafe fn call_initializers() {
-    write!(&mut crate::nx::KernelWritter, "call_initializers").ok();
     for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link) {
         if let Some(init_function) = module_runtime.dt_init {
             init_function();
         }
     }
-    write!(&mut crate::nx::KernelWritter, "call_initializers DONE").ok();
 }
 
 pub unsafe fn call_finilizers() {
-    write!(&mut crate::nx::KernelWritter, "call_finilizers").ok();
     for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link) {
         if let Some(fini_function) = module_runtime.dt_fini {
             fini_function();
         }
     }
-    write!(&mut crate::nx::KernelWritter, "call_finilizers DONE").ok();
 }
 
 // TODO: Move to ModuleRuntime after refacto
