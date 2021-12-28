@@ -5,15 +5,9 @@
 .hidden __rtld_clean_bss
 .hidden __rtld_relocate_self
 .hidden main
+.hidden __rtld_handle_exception
 .hidden SELF_MODULE_RUNTIME
-
-.macro FUNC_RELATIVE_ASLR name, register_num, symbol
-.word \symbol - .
-\name:
-    ldr w\register_num, [x30]
-    sxtw x\register_num, w\register_num
-    add x\register_num, x\register_num, x30
-.endm
+.hidden EXCEPTION_HANDLER_READY
 
 .section ".text.crt0","ax",%progbits
 
@@ -40,7 +34,13 @@ __rtld_shim_entrypoint:
     b .
 
 __rtld_entry_exception_shim:
-    # TODO: finish this
+    adrp x2, EXCEPTION_HANDLER_READY
+    add x2, x2, #:lo12:EXCEPTION_HANDLER_READY
+    ldr w2, [x2]
+    cbz w2, __rtld_unhandled_exception
+    bl __rtld_handle_exception
+
+__rtld_unhandled_exception:
     mov w0, 0xF801
     svc 0x28
     b .

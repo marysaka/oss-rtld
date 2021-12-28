@@ -15,23 +15,38 @@ use crate::{
 mod nx;
 mod rtld;
 
+// NOTE: We differ from Nintendo here to provide the exception type to the user directly.
+type CustomExceptionHandlerFunc = extern "C" fn (u32);
+type SdkExceptionHandlerFunc = extern "C" fn ();
+type CustomStartFunc = extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn(), unsafe extern fn());
+type Sdk10StartFunc = extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn(), unsafe extern fn());
+type Sdk03StartFunc = extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn());
+
 extern "C" {
     static __argdata__: c_void;
 
-    // Custom binding
+    // Custom user exception handler
+    #[linkage = "extern_weak"]
+    static __rtld_custom_user_exception_handler: *const c_void;
+
+    // SDK user exception handler
+    #[linkage = "extern_weak"]
+    static _ZN2nn2os6detail20UserExceptionHandlerEv: *const c_void;
+
+    // Custom start entrypoint
     #[linkage = "extern_weak"]
     static __rtld_custom_start: *const c_void;
 
-    // [11.0.0+] SDK bindings
+    // [11.0.0+] SDK start entrypoint
     #[linkage = "extern_weak"]
     static _ZN2nn4init5StartEmmPFvvES2_S2_: *const c_void;
 
 
-    // [3.0.0-11.0.0] SDK bindings
+    // [3.0.0-11.0.0] SDK start entrypoint
     #[linkage = "extern_weak"]
     static _ZN2nn4init5StartEmmPFvvES2_: *const c_void;
 
-    // [1.0.0-3.0.0] SDK bindings
+    // [1.0.0-3.0.0] SDK start entrypoint internals (inlined in RTLD)
     fn __nnDetailInitLibc0();
     fn __nnDetailInitLibc1();
     fn __nnDetailInitLibc2();
@@ -86,6 +101,7 @@ static mut SELF_MODULE_RUNTIME: ModuleRuntime = ModuleRuntime {
     cannot_revert_symbols: false,
 };
 
+#[no_mangle]
 pub static mut EXCEPTION_HANDLER_READY: bool = false;
 
 #[inline(always)]
@@ -96,6 +112,16 @@ unsafe fn get_function_from_ptr<T>(ptr: *const c_void) -> Option<T> where T: Siz
         Some(*(&ptr as *const *const c_void as *const T))
     }
 
+}
+
+#[no_mangle]
+unsafe extern "C" fn __rtld_handle_exception(exception_type: u32) {
+    if let Some(custom_user_exception_handler) = get_function_from_ptr::<CustomExceptionHandlerFunc>(__rtld_custom_user_exception_handler) {
+        custom_user_exception_handler(exception_type);
+    }
+    if let Some(sdk_user_exception_handler) = get_function_from_ptr::<SdkExceptionHandlerFunc>(_ZN2nn2os6detail20UserExceptionHandlerEv) {
+        sdk_user_exception_handler();
+    }
 }
 
 #[allow(non_snake_case)]
@@ -203,12 +229,6 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
             }
         }
 
-        type CustomStartFunc =
-            extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn(), unsafe extern fn());
-        type Sdk10StartFunc =
-            extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn(), unsafe extern fn());
-        type Sdk03StartFunc = extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn());
-
         let rtld_custom_start_option = get_function_from_ptr::<CustomStartFunc>(__rtld_custom_start);
         let sdk10_start_option = get_function_from_ptr::<Sdk10StartFunc>(_ZN2nn4init5StartEmmPFvvES2_S2_);
         let sdk03_start_option = get_function_from_ptr::<Sdk03StartFunc>(_ZN2nn4init5StartEmmPFvvES2_);
@@ -280,3 +300,4 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
 unsafe extern "C" fn notify_exception_handler_ready() {
     EXCEPTION_HANDLER_READY = true;
 }
+
