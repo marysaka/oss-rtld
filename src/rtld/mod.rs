@@ -189,7 +189,6 @@ pub enum SymbolType {
 #[bitfield(bits = 8)]
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(C)]
-#[allow(dead_code)]
 pub struct SymbolInfo {
     pub symbol_type: SymbolType,
     pub bind_global: bool,
@@ -577,7 +576,6 @@ impl ModuleRuntime {
                 if let Some(target_address) = self.resolve_symbol(&symbol_to_resolve) {
                     relocation.apply(self.module_base, target_address as *const u8);
                 } else if RO_DEBUG_FLAG {
-                    write!(&mut crate::nx::KernelWritter, "{:?}", relocations.len()).ok();
                     write!(
                         &mut crate::nx::KernelWritter,
                         "[rtld] warning: unresolved symbol = '{:?}'",
@@ -665,7 +663,7 @@ impl ModuleRuntime {
                 } else {
                     write!(
                         &mut crate::nx::KernelWritter,
-                        "Warning invalid symbol was found: {:?}",
+                        "[rtld] warning: invalid symbol was found: '{:?}'",
                         symbol
                     )
                     .ok();
@@ -858,46 +856,6 @@ impl<'a> Iterator for ModuleRuntimeIter<'a> {
     }
 }
 
-// TODO: Move this here and remove global_asm usage
-extern "C" {
-    static __nx_mod0: Module;
-}
-
-#[no_mangle]
-#[used]
-pub static mut SELF_MODULE_RUNTIME: ModuleRuntime = ModuleRuntime {
-    link: ModuleRuntimeLink {
-        next: core::ptr::null_mut(),
-        prev: core::ptr::null_mut(),
-    },
-    procedure_linkage_table: core::ptr::null(),
-    relocations: core::ptr::null(),
-    module_base: core::ptr::null(),
-    dynamic_table: core::ptr::null(),
-    is_rela: false,
-    procedure_linkage_table_size: 0,
-    dt_init: None,
-    dt_fini: None,
-    hash_bucket: core::ptr::null(),
-    hash_chain: core::ptr::null(),
-    dynamic_str: core::ptr::null(),
-    dynamic_symbols: core::ptr::null(),
-    dynamic_str_size: 0,
-    global_offset_table: core::ptr::null_mut(),
-    rela_dynamic_size: 0,
-    rel_dynamic_size: 0,
-    rel_count: 0,
-    rela_count: 0,
-    hash_nchain_value: 0,
-    hash_nbucket_value: 0,
-    got_stub_ptr: 0,
-
-    // 6.x
-    soname_idx: 0,
-    nro_size: 0,
-    cannot_revert_symbols: false,
-};
-
 pub static mut MANUAL_LOAD_LIST: ModuleObjectList = ModuleObjectList {
     link: ModuleRuntimeLink {
         next: core::ptr::null_mut(),
@@ -962,14 +920,15 @@ pub extern "C" fn default_lookup_auto_list(
 }
 
 #[inline(always)]
-pub unsafe fn initialize() {
+pub unsafe fn initialize(self_module: &mut ModuleRuntime) {
     MANUAL_LOAD_LIST.initialize();
     GLOBAL_LOAD_LIST.initialize();
 
-    GLOBAL_LOAD_LIST.link(&mut SELF_MODULE_RUNTIME);
+    GLOBAL_LOAD_LIST.link(self_module);
 }
 
-pub fn relocate_self(module_base: *mut u8) {
+#[no_mangle]
+pub fn __rtld_relocate_self(module_base: *mut u8) {
     let module: &Module = unsafe { &*Module::get_module_by_module_base(module_base) };
     let module_runtime = unsafe { module.get_module_runtime() };
 
@@ -977,7 +936,7 @@ pub fn relocate_self(module_base: *mut u8) {
     module_runtime.relocate(false, true);
 }
 
-pub unsafe fn call_initializers() {
+pub unsafe extern "C" fn call_initializers() {
     for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link) {
         if let Some(init_function) = module_runtime.dt_init {
             init_function();
@@ -985,7 +944,7 @@ pub unsafe fn call_initializers() {
     }
 }
 
-pub unsafe fn call_finilizers() {
+pub unsafe extern "C" fn call_finilizers() {
     for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link) {
         if let Some(fini_function) = module_runtime.dt_fini {
             fini_function();
@@ -1086,21 +1045,4 @@ pub unsafe extern "C" fn runtime_resolve() -> ! {
         sym lazy_bind_symbol,
         options(noreturn),
     )
-}
-
-pub fn get_exported_function<T>(name: &str) -> Option<T>
-where
-    T: Sized + Copy,
-{
-    for module_runtime in ModuleRuntimeIter::new(unsafe { &mut GLOBAL_LOAD_LIST.link }) {
-        if let Some(symbol) = module_runtime.get_symbol_by_name(name) {
-            if let Some(value) = module_runtime.resolve_symbol(&symbol) {
-                if value != 0 {
-                    return Some(unsafe { *(&value as *const usize as *const T) });
-                }
-            }
-        }
-    }
-
-    None
 }

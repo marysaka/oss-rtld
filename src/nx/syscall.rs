@@ -3,7 +3,6 @@ use modular_bitfield::prelude::*;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[repr(u32)]
-#[allow(dead_code)]
 pub enum BreakReason {
     Panic = 0,
     Assert = 1,
@@ -18,7 +17,6 @@ pub enum BreakReason {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[repr(u32)]
-#[allow(dead_code)]
 pub enum MemoryState {
     Free = 0,
     Io = 1,
@@ -54,7 +52,6 @@ impl Default for MemoryState {
 #[bitfield]
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(u32)]
-#[allow(dead_code)]
 pub struct MemoryPermission {
     pub read: bool,
     pub write: bool,
@@ -65,7 +62,6 @@ pub struct MemoryPermission {
 #[bitfield]
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(u32)]
-#[allow(dead_code)]
 pub struct MemoryAttribute {
     pub locked: bool,
     pub ipc_locked: bool,

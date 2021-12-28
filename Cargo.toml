@@ -13,3 +13,6 @@ debug = true
 lto = true
 opt-level = 's'
 panic = 'abort'
+
+[lib]
+crate-type = ["cdylib"]

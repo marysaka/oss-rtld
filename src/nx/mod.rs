@@ -41,5 +41,5 @@ const __MODULE_NAME_RAW: &[u8; 9] = b"oss-rtld\0";
 const __MODULE_NAME_LEN: usize = __MODULE_NAME_RAW.len();
 
 #[used]
-#[link_section = ".application_name"]
+#[link_section = ".rodata.application_name"]
 pub static __MODULE_NAME: ModuleName<__MODULE_NAME_LEN> = ModuleName::new(__MODULE_NAME_RAW);

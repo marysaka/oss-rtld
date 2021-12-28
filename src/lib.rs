@@ -1,15 +1,14 @@
-#![feature(asm_sym, naked_functions)]
+#![feature(asm_sym, naked_functions, linkage)]
 #![no_std]
 #![no_main]
 #![allow(dead_code)]
 
 use core::ffi::c_void;
-
 use crate::{
     nx::syscall::{MemoryInfo, MemoryState},
     rtld::{
-        LookupFunction, Module, ModuleObjectList, ModuleRuntimeIter, GLOBAL_LOAD_LIST,
-        LOOKUP_FUNCTIONS, MANUAL_LOAD_LIST, RO_DEBUG_FLAG, SELF_MODULE_RUNTIME,
+        LookupFunction, Module, ModuleObjectList, ModuleRuntime, ModuleRuntimeIter,
+        ModuleRuntimeLink, GLOBAL_LOAD_LIST, LOOKUP_FUNCTIONS, MANUAL_LOAD_LIST, RO_DEBUG_FLAG
     },
 };
 
@@ -18,14 +17,95 @@ mod rtld;
 
 extern "C" {
     static __argdata__: c_void;
+
+    // Custom binding
+    #[linkage = "extern_weak"]
+    static __rtld_custom_start: *const c_void;
+
+    // [11.0.0+] SDK bindings
+    #[linkage = "extern_weak"]
+    static _ZN2nn4init5StartEmmPFvvES2_S2_: *const c_void;
+
+
+    // [3.0.0-11.0.0] SDK bindings
+    #[linkage = "extern_weak"]
+    static _ZN2nn4init5StartEmmPFvvES2_: *const c_void;
+
+    // [1.0.0-3.0.0] SDK bindings
+    fn __nnDetailInitLibc0();
+    fn __nnDetailInitLibc1();
+    fn __nnDetailInitLibc2();
+    fn nninitStartup();
+    fn nndiagStartup();
+    fn nnosInitialize(thread_handle: usize, argument_ptr: *const c_void);
+    fn nnMain();
+    fn nnosQuickExit();
+
+    #[linkage = "extern_weak"]
+    static nninitInitializeSdkModule: *const c_void;
+
+    #[linkage = "extern_weak"]
+    static nninitInitializeAbortObserver: *const c_void;
+
+    #[linkage = "extern_weak"]
+    static nninitFinalizeSdkModule: *const c_void;
 }
+
+#[no_mangle]
+#[used]
+static mut SELF_MODULE_RUNTIME: ModuleRuntime = ModuleRuntime {
+    link: ModuleRuntimeLink {
+        next: core::ptr::null_mut(),
+        prev: core::ptr::null_mut(),
+    },
+    procedure_linkage_table: core::ptr::null(),
+    relocations: core::ptr::null(),
+    module_base: core::ptr::null(),
+    dynamic_table: core::ptr::null(),
+    is_rela: false,
+    procedure_linkage_table_size: 0,
+    dt_init: None,
+    dt_fini: None,
+    hash_bucket: core::ptr::null(),
+    hash_chain: core::ptr::null(),
+    dynamic_str: core::ptr::null(),
+    dynamic_symbols: core::ptr::null(),
+    dynamic_str_size: 0,
+    global_offset_table: core::ptr::null_mut(),
+    rela_dynamic_size: 0,
+    rel_dynamic_size: 0,
+    rel_count: 0,
+    rela_count: 0,
+    hash_nchain_value: 0,
+    hash_nbucket_value: 0,
+    got_stub_ptr: 0,
+
+    // 6.x
+    soname_idx: 0,
+    nro_size: 0,
+    cannot_revert_symbols: false,
+};
 
 pub static mut EXCEPTION_HANDLER_READY: bool = false;
 
+#[inline(always)]
+unsafe fn get_function_from_ptr<T>(ptr: *const c_void) -> Option<T> where T: Sized + Copy {
+    if ptr.is_null() {
+        None
+    } else {
+        Some(*(&ptr as *const *const c_void as *const T))
+    }
+
+}
+
 #[allow(non_snake_case)]
+#[no_mangle]
 pub fn main(module_base: *mut u8, thread_handle: u32) {
     unsafe {
-        rtld::initialize();
+        let module: &Module = &*Module::get_module_by_module_base(module_base);
+        let module_runtime = module.get_module_runtime();
+
+        rtld::initialize(module_runtime);
 
         let linker_module_base = module_base as u64;
 
@@ -118,47 +198,42 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
             }
 
             for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link) {
-                module_runtime.relocate(
-                    module_runtime.module_base == SELF_MODULE_RUNTIME.module_base,
-                    false,
-                );
+                module_runtime.relocate(module_runtime.module_base == module_base, false);
                 module_runtime.resolve_symbols(false);
             }
         }
 
         type CustomStartFunc =
-            extern "C" fn(usize, *const c_void, unsafe fn(), unsafe fn(), unsafe fn());
+            extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn(), unsafe extern fn());
         type Sdk10StartFunc =
-            extern "C" fn(usize, *const c_void, unsafe fn(), unsafe fn(), unsafe fn());
-        type Sdk03StartFunc = extern "C" fn(usize, *const c_void, unsafe fn(), unsafe fn());
+            extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn(), unsafe extern fn());
+        type Sdk03StartFunc = extern "C" fn(usize, *const c_void, unsafe extern fn(), unsafe extern fn());
 
-        if let Some(init_function) =
-            rtld::get_exported_function::<CustomStartFunc>("__rtld_custom_start")
-        {
+        let rtld_custom_start_option = get_function_from_ptr::<CustomStartFunc>(__rtld_custom_start);
+        let sdk10_start_option = get_function_from_ptr::<Sdk10StartFunc>(_ZN2nn4init5StartEmmPFvvES2_S2_);
+        let sdk03_start_option = get_function_from_ptr::<Sdk03StartFunc>(_ZN2nn4init5StartEmmPFvvES2_);
+
+        if let Some(rtld_custom_start) = rtld_custom_start_option {
             // Custom initialization
-            init_function(
+            rtld_custom_start(
                 thread_handle as usize,
                 &__argdata__,
                 notify_exception_handler_ready,
                 rtld::call_initializers,
                 rtld::call_finilizers,
             );
-        } else if let Some(init_function) =
-            rtld::get_exported_function::<Sdk10StartFunc>("_ZN2nn4init5StartEmmPFvvES2_S2_")
-        {
+        } else if let Some(sdk10_start) = sdk10_start_option {
             // ~10.x SDK initialization
-            init_function(
+            sdk10_start(
                 thread_handle as usize,
                 &__argdata__,
                 notify_exception_handler_ready,
                 rtld::call_initializers,
                 rtld::call_finilizers,
             );
-        } else if let Some(init_function) =
-            rtld::get_exported_function::<Sdk03StartFunc>("_ZN2nn4init5StartEmmPFvvES2_")
-        {
+        } else if let Some(sdk03_start) = sdk03_start_option {
             // ~3.x SDK initialization
-            init_function(
+            sdk03_start(
                 thread_handle as usize,
                 &__argdata__,
                 notify_exception_handler_ready,
@@ -167,33 +242,9 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
         } else {
             // In other cases, we assume SDK from before 3.x (brace yourself, this is hell)
 
-            let __nnDetailInitLibc0 =
-                &rtld::get_exported_function::<extern "C" fn()>("__nnDetailInitLibc0").unwrap();
-            let nnosInitialize =
-                rtld::get_exported_function::<extern "C" fn(usize, *const c_void)>(
-                    "nnosInitialize",
-                )
-                .unwrap();
-            let __nnDetailInitLibc1 =
-                rtld::get_exported_function::<extern "C" fn()>("__nnDetailInitLibc1").unwrap();
-            let nndiagStartup =
-                rtld::get_exported_function::<extern "C" fn()>("nndiagStartup").unwrap();
-
-            let nninitStartup =
-                rtld::get_exported_function::<extern "C" fn()>("nninitStartup").unwrap();
-            let __nnDetailInitLibc2 =
-                rtld::get_exported_function::<extern "C" fn()>("__nnDetailInitLibc1").unwrap();
-            let nnMain = rtld::get_exported_function::<extern "C" fn()>("nnMain").unwrap();
-            let nnosQuickExit =
-                rtld::get_exported_function::<extern "C" fn()>("nnosQuickExit").unwrap();
-
-            // Weak symbols
-            let nninitInitializeSdkModuleOption =
-                rtld::get_exported_function::<extern "C" fn()>("nninitInitializeSdkModule");
-            let nninitInitializeAbortObserverOption =
-                rtld::get_exported_function::<extern "C" fn()>("nninitInitializeAbortObserver");
-            let nninitFinalizeSdkModuleOption =
-                rtld::get_exported_function::<extern "C" fn()>("nninitFinalizeSdkModule");
+            let initialize_sdk_module_option = get_function_from_ptr::<extern fn()>(nninitInitializeSdkModule);
+            let initialize_abort_observer_option = get_function_from_ptr::<extern fn()>(nninitInitializeAbortObserver);
+            let finalize_sdk_module_option = get_function_from_ptr::<extern fn()>(nninitFinalizeSdkModule);
 
             __nnDetailInitLibc0();
             nnosInitialize(thread_handle as usize, &__argdata__);
@@ -201,12 +252,12 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
             __nnDetailInitLibc1();
             nndiagStartup();
 
-            if let Some(nninitInitializeSdkModule) = nninitInitializeSdkModuleOption {
-                nninitInitializeSdkModule();
+            if let Some(initialize_sdk_module) = initialize_sdk_module_option {
+                initialize_sdk_module();
             }
 
-            if let Some(nninitInitializeAbortObserver) = nninitInitializeAbortObserverOption {
-                nninitInitializeAbortObserver();
+            if let Some(initialize_abort_observer) = initialize_abort_observer_option {
+                initialize_abort_observer();
             }
 
             nninitStartup();
@@ -215,8 +266,8 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
             rtld::call_initializers();
             nnMain();
 
-            if let Some(nninitFinalizeSdkModule) = nninitFinalizeSdkModuleOption {
-                nninitFinalizeSdkModule();
+            if let Some(finalize_sdk_module) = finalize_sdk_module_option {
+                finalize_sdk_module();
             }
 
             nnosQuickExit();
@@ -226,6 +277,6 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
     }
 }
 
-unsafe fn notify_exception_handler_ready() {
+unsafe extern "C" fn notify_exception_handler_ready() {
     EXCEPTION_HANDLER_READY = true;
 }
