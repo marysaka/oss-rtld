@@ -1,8 +1,8 @@
-use core::arch::global_asm;
 use core::fmt::Write;
 use core::panic::PanicInfo;
 
-use super::syscall::{break_, BreakReason};
+use super::common::BreakReason;
+use super::syscall::break_;
 
 #[panic_handler]
 fn panic(panic_info: &PanicInfo<'_>) -> ! {
@@ -14,9 +14,6 @@ fn panic(panic_info: &PanicInfo<'_>) -> ! {
 
     loop {}
 }
-
-// TODO: Arch selection
-global_asm!(include_str!("aarch64/crt0.s"));
 
 #[no_mangle]
 unsafe extern "C" fn __rtld_clean_bss(start_bss: *mut u8, end_bss: *mut u8) {

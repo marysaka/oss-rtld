@@ -5,6 +5,8 @@ use static_assertions::assert_eq_size;
 
 use modular_bitfield::prelude::*;
 
+use crate::nx::syscall;
+
 // TODO: Use an enum here.
 const DT_NULL: isize = 0;
 const DT_NEEDED: isize = 1;
@@ -33,33 +35,79 @@ const DT_JMPREL: isize = 23;
 const DT_RELACOUNT: isize = 0x6ffffff9;
 const DT_RELCOUNT: isize = 0x6ffffffa;
 
-// TODO: ARMv8
+const R_ARM_ABS32: usize = 2;
+const R_ARM_GLOB_DAT: usize = 21;
+const R_ARM_JUMP_SLOT: usize = 22;
+const R_ARM_RELATIVE: usize = 23;
+
+#[cfg(target_arch = "arm")]
+#[inline(always)]
+fn is_arch_got_relocation_type(reloc_type: usize) -> bool {
+    reloc_type == R_ARM_ABS32 || reloc_type == R_ARM_GLOB_DAT
+}
+
+#[cfg(target_arch = "arm")]
+#[inline(always)]
+fn is_arch_jump_slot_relocation_type(reloc_type: usize) -> bool {
+    reloc_type == R_ARM_JUMP_SLOT
+}
+
+#[cfg(target_arch = "arm")]
+#[inline(always)]
+fn is_arch_relative_relocation_type(reloc_type: usize) -> bool {
+    reloc_type == R_ARM_RELATIVE
+}
+
 const R_AARCH64_ABS64: usize = 0x101;
 const R_AARCH64_ABS32: usize = 0x102;
 const R_AARCH64_GLOB_DAT: usize = 0x401;
 const R_AARCH64_JUMP_SLOT: usize = 0x402;
 const R_AARCH64_RELATIVE: usize = 0x403;
 
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
 fn is_arch_got_relocation_type(reloc_type: usize) -> bool {
     reloc_type == R_AARCH64_ABS64
         || reloc_type == R_AARCH64_ABS32
         || reloc_type == R_AARCH64_GLOB_DAT
 }
 
-trait Relocation: Sized + Debug {
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+fn is_arch_jump_slot_relocation_type(reloc_type: usize) -> bool {
+    reloc_type == R_AARCH64_JUMP_SLOT
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+fn is_arch_relative_relocation_type(reloc_type: usize) -> bool {
+    reloc_type == R_AARCH64_RELATIVE
+}
+
+pub trait Relocation: Sized + Debug {
     fn get_info(&self) -> usize;
     fn get_offset(&self) -> usize;
     fn compute_value(&self, value: *const u8) -> usize;
     fn apply(&self, module_base: *const u8, value: *const u8);
 
+    #[cfg(target_pointer_width = "64")]
     fn get_type(&self) -> usize {
-        // TODO: ARMv8
         self.get_info() & u32::MAX as usize
     }
 
+    #[cfg(target_pointer_width = "64")]
     fn get_symbol_index(&self) -> usize {
-        // TODO: ARMv8
         self.get_info() >> 32
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    fn get_type(&self) -> usize {
+        self.get_info() & u8::MAX as usize
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    fn get_symbol_index(&self) -> usize {
+        self.get_info() >> 8
     }
 }
 
@@ -138,7 +186,7 @@ pub struct DynamicTableEntry {
 }
 
 #[derive(Debug)]
-struct DynamicTableItererator<'a> {
+pub struct DynamicTableItererator<'a> {
     current: *const DynamicTableEntry,
     _phantom: PhantomData<&'a DynamicTableEntry>,
 }
@@ -216,7 +264,7 @@ pub struct SymbolOther {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-// TODO: Arch dependent structs
+#[cfg(target_pointer_width = "64")]
 pub struct SymbolTableEntry {
     pub name_offset: u32,
     pub info: SymbolInfo,
@@ -224,6 +272,18 @@ pub struct SymbolTableEntry {
     pub section: u16,
     pub value: usize,
     pub size: usize,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+#[cfg(target_pointer_width = "32")]
+pub struct SymbolTableEntry {
+    pub name_offset: u32,
+    pub value: usize,
+    pub size: usize,
+    pub info: SymbolInfo,
+    pub other: SymbolOther,
+    pub section: u16,
 }
 
 #[repr(C)]
@@ -302,7 +362,7 @@ impl ModuleRuntimeLink {
     }
 
     #[inline(always)]
-    pub unsafe fn link(&mut self, other: *mut ModuleRuntimeLink) {
+    pub unsafe fn link_reverse(&mut self, other: *mut ModuleRuntimeLink) {
         let other_prev = (*other).prev;
 
         (*other).prev = self.prev;
@@ -310,6 +370,17 @@ impl ModuleRuntimeLink {
         (*self.next).next = other;
 
         self.prev = other_prev;
+    }
+
+    #[inline(always)]
+    pub unsafe fn link(&mut self, other: *mut ModuleRuntimeLink) {
+        let other_prev = (*other).prev;
+
+        (*other).prev = self as *mut ModuleRuntimeLink;
+        (*other_prev).next = self.next;
+        (*self.next).prev = other_prev;
+
+        self.next = other;
     }
 
     #[inline(always)]
@@ -386,6 +457,10 @@ impl Default for ModuleRuntime {
     }
 }
 
+#[cfg(target_arch = "arm")]
+assert_eq_size!([u8; 0x68], ModuleRuntime);
+
+#[cfg(target_arch = "aarch64")]
 assert_eq_size!([u8; 0xD0], ModuleRuntime);
 
 #[derive(Debug)]
@@ -397,11 +472,11 @@ struct HashBucketIter<'a> {
 
 impl<'a> HashBucketIter<'a> {
     #[inline(always)]
-    fn compute_pjw_hash(data: &[u8]) -> u64 {
+    fn compute_pjw_hash(data: &[u8]) -> usize {
         let mut h = 0;
 
         for byte in data {
-            h = (h << 4) + u64::from(*byte);
+            h = (h << 4) + usize::from(*byte);
 
             let high = h & 0xF0000000;
 
@@ -411,11 +486,12 @@ impl<'a> HashBucketIter<'a> {
 
             h &= !high;
         }
+
         return h;
     }
 
     pub fn new(module_runtime: &'a ModuleRuntime, name: &str) -> Self {
-        let name_hash = Self::compute_pjw_hash(name.as_bytes()) as usize;
+        let name_hash = Self::compute_pjw_hash(name.as_bytes());
 
         let bucket = unsafe {
             core::slice::from_raw_parts(
@@ -450,6 +526,17 @@ impl<'a> Iterator for HashBucketIter<'a> {
         self.chain_value = self.chain[self.chain_value as usize];
 
         Some(value)
+    }
+}
+
+#[inline]
+fn loop_assert(cond_res: bool) {
+    if !cond_res {
+        unsafe {
+            syscall::break_(crate::nx::common::BreakReason::Panic, 0, 0);
+        }
+
+        loop {}
     }
 }
 
@@ -497,14 +584,12 @@ impl ModuleRuntime {
                             self.module_base.add(entry.value as usize) as *const c_void;
                     }
                     DT_RELASZ => self.rela_dynamic_size = entry.value,
-                    DT_RELAENT => {
-                        debug_assert!(
-                            entry.value == core::mem::size_of::<RelocationTableAddendEntry>()
-                        )
-                    }
+                    DT_RELAENT => loop_assert(
+                        entry.value == core::mem::size_of::<RelocationTableAddendEntry>(),
+                    ),
                     DT_STRSZ => self.dynamic_str_size = entry.value,
                     DT_SYMENT => {
-                        debug_assert!(entry.value == core::mem::size_of::<SymbolTableEntry>())
+                        loop_assert(entry.value == core::mem::size_of::<SymbolTableEntry>())
                     }
                     DT_INIT => {
                         self.dt_init = Some(
@@ -520,13 +605,13 @@ impl ModuleRuntime {
                     DT_SONAME => self.soname_idx = entry.value as usize,
                     DT_RELSZ => self.rel_dynamic_size = entry.value as usize,
                     DT_RELENT => {
-                        debug_assert!(entry.value == core::mem::size_of::<RelocationTableEntry>())
+                        loop_assert(entry.value == core::mem::size_of::<RelocationTableEntry>())
                     }
                     DT_PLTREL => {
                         let value = entry.value as isize;
                         self.is_rela = value == DT_RELA;
 
-                        debug_assert!(value == DT_REL || value == DT_RELA);
+                        loop_assert(value == DT_REL || value == DT_RELA);
                     }
                     DT_JMPREL => {
                         self.procedure_linkage_table =
@@ -539,6 +624,25 @@ impl ModuleRuntime {
                         //write!(&mut crate::nx::KernelWritter, "Unknown DT: {}", unknown_dt).ok();
                     }
                 }
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn relocate_relative_entries<T>(
+        module_base: *const u8,
+        relocations: *const T,
+        relocations_count: usize,
+    ) where
+        T: Relocation,
+    {
+        let relocations = unsafe { core::slice::from_raw_parts(relocations, relocations_count) };
+
+        for relocation in relocations {
+            let relocation_type = relocation.get_type();
+
+            if is_arch_relative_relocation_type(relocation_type) {
+                relocation.apply(module_base, module_base);
             }
         }
     }
@@ -566,7 +670,7 @@ impl ModuleRuntime {
         for relocation in relocations {
             let relocation_type = relocation.get_type();
 
-            if !skip_relative && relocation_type == R_AARCH64_RELATIVE {
+            if !skip_relative && is_arch_relative_relocation_type(relocation_type) {
                 relocation.apply(self.module_base, self.module_base);
             }
             if !skip_got && is_arch_got_relocation_type(relocation_type) {
@@ -728,14 +832,14 @@ impl ModuleRuntime {
         for relocation in procedure_linkage_table {
             let relocation_type = relocation.get_type();
 
-            if relocation_type == R_AARCH64_JUMP_SLOT {
+            if is_arch_jump_slot_relocation_type(relocation_type) {
                 let target = unsafe { self.module_base.add(relocation.get_offset()) as *mut usize };
                 let target_ptr = unsafe { self.module_base.add(*target) as usize };
 
                 if self.got_stub_ptr == 0 {
                     self.got_stub_ptr = target_ptr;
                 } else {
-                    debug_assert!(self.got_stub_ptr == target_ptr);
+                    loop_assert(self.got_stub_ptr == target_ptr);
                 }
 
                 if lazy_init {
@@ -778,7 +882,6 @@ impl ModuleRuntime {
             // Setup GOT stub parameters
             unsafe {
                 *self.global_offset_table.add(1) = self as *const Self as *mut _;
-                // TODO: lazy loading setup
                 *self.global_offset_table.add(2) = runtime_resolve as *mut _;
             }
         }
@@ -808,6 +911,11 @@ impl ModuleObjectList {
     }
 
     #[inline(always)]
+    pub unsafe fn link_reverse(&mut self, other: *mut ModuleRuntime) {
+        self.link.link_reverse(&mut (*other).link);
+    }
+
+    #[inline(always)]
     pub unsafe fn link(&mut self, other: *mut ModuleRuntime) {
         self.link.link(&mut (*other).link);
     }
@@ -822,15 +930,25 @@ impl ModuleObjectList {
 pub struct ModuleRuntimeIter<'a> {
     root: *mut ModuleRuntimeLink,
     current: *const ModuleRuntimeLink,
+    is_reverse: bool,
     _phantom: PhantomData<&'a ModuleRuntimeLink>,
 }
 
 impl<'a> ModuleRuntimeIter<'a> {
-    pub fn new(root: *mut ModuleRuntimeLink) -> Self {
+    pub fn new(root: *mut ModuleRuntimeLink, is_reverse: bool) -> Self {
         ModuleRuntimeIter {
             root: root,
-            current: unsafe { (*root).prev },
+            current: Self::update_next(root, is_reverse),
+            is_reverse,
             _phantom: PhantomData::default(),
+        }
+    }
+
+    fn update_next(node: *const ModuleRuntimeLink, is_reverse: bool) -> *const ModuleRuntimeLink {
+        if is_reverse {
+            unsafe { (*node).prev }
+        } else {
+            unsafe { (*node).next }
         }
     }
 }
@@ -847,9 +965,7 @@ impl<'a> Iterator for ModuleRuntimeIter<'a> {
         } else {
             let result = unsafe { Some(&mut *(self.current as *mut ModuleRuntime)) };
 
-            unsafe {
-                self.current = (*self.current).prev;
-            }
+            self.current = Self::update_next(self.current, self.is_reverse);
 
             result
         }
@@ -909,7 +1025,7 @@ pub extern "C" fn default_lookup_auto_list(
     }
 
     if let Some(name) = unsafe { parse_cstr(raw_name) } {
-        for module_runtime in ModuleRuntimeIter::new(unsafe { &mut GLOBAL_LOAD_LIST.link }) {
+        for module_runtime in ModuleRuntimeIter::new(unsafe { &mut GLOBAL_LOAD_LIST.link }, false) {
             if let Some(symbol) = module_runtime.get_external_symbol_by_name(name) {
                 return unsafe { module_runtime.get_symbol_value(&symbol) as usize };
             }
@@ -924,20 +1040,11 @@ pub unsafe fn initialize(self_module: &mut ModuleRuntime) {
     MANUAL_LOAD_LIST.initialize();
     GLOBAL_LOAD_LIST.initialize();
 
-    GLOBAL_LOAD_LIST.link(self_module);
-}
-
-#[no_mangle]
-pub fn __rtld_relocate_self(module_base: *mut u8) {
-    let module: &Module = unsafe { &*Module::get_module_by_module_base(module_base) };
-    let module_runtime = unsafe { module.get_module_runtime() };
-
-    module_runtime.initialize(module_base, module);
-    module_runtime.relocate(false, true);
+    GLOBAL_LOAD_LIST.link_reverse(self_module);
 }
 
 pub unsafe extern "C" fn call_initializers() {
-    for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link) {
+    for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link, true) {
         if let Some(init_function) = module_runtime.dt_init {
             init_function();
         }
@@ -945,7 +1052,7 @@ pub unsafe extern "C" fn call_initializers() {
 }
 
 pub unsafe extern "C" fn call_finilizers() {
-    for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link) {
+    for module_runtime in ModuleRuntimeIter::new(&mut GLOBAL_LOAD_LIST.link, false) {
         if let Some(fini_function) = module_runtime.dt_fini {
             fini_function();
         }
@@ -997,6 +1104,7 @@ unsafe fn lazy_bind_symbol(module: *mut ModuleRuntime, index: usize) -> usize {
 }
 
 #[naked]
+#[cfg(target_arch = "aarch64")]
 pub unsafe extern "C" fn runtime_resolve() -> ! {
     asm!(
         "
@@ -1041,6 +1149,42 @@ pub unsafe extern "C" fn runtime_resolve() -> ! {
         ldp x29, x30, [sp], #0x10
         br x16
         b .
+        ",
+        sym lazy_bind_symbol,
+        options(noreturn),
+    )
+}
+
+#[naked]
+#[cfg(target_arch = "arm")]
+pub unsafe extern "C" fn runtime_resolve() -> ! {
+    asm!(
+        "
+        /* ARMv7 we get called with:
+        stack[0] contains the return address from this call
+        ip contains &GOT[n+3] (pointer to function)
+        lr points to &GOT[2]
+    
+        lr                &GOT[2]
+        ip (r12)          &GOT[n]
+    
+        What we need:
+        r0 = calling module (lr[-1])
+        r1 = .rel.plt index ((ip - lr - 4) / 4)
+        */
+        stmfd sp!, {{r0-r4}}
+        vpush {{d0-d7}}
+        sub r1, r12, lr
+        sub r1, r1, 4
+        mov r1, r1, lsr #2
+        ldr r0, [lr, #-4]
+        mov r4, r12
+        bl {}
+        str r0, [r4]
+        mov r12, r0
+        vpop {{d0-d7}}
+        ldmfd sp!, {{r0-r4, lr}}
+        bx r12
         ",
         sym lazy_bind_symbol,
         options(noreturn),

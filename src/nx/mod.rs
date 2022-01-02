@@ -1,7 +1,20 @@
 use core::fmt::Write;
 
+pub mod common;
+
+#[cfg(target_arch = "arm")]
+mod aarch32;
+
+#[cfg(target_arch = "arm")]
+pub use aarch32::syscall;
+
+#[cfg(target_arch = "aarch64")]
+mod aarch64;
+
+#[cfg(target_arch = "aarch64")]
+pub use aarch64::syscall;
+
 pub mod rt;
-pub mod syscall;
 
 #[derive(Debug, Clone, Copy)]
 pub struct KernelWritter;
