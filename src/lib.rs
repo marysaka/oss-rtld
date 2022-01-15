@@ -1,7 +1,8 @@
 #![feature(asm_sym, naked_functions, linkage)]
 #![no_std]
 #![no_main]
-#![allow(dead_code)]
+#![allow(dead_code, clippy::identity_op)]
+
 
 use core::ffi::c_void;
 
@@ -130,9 +131,9 @@ where
 }
 
 #[no_mangle]
-pub fn __rtld_relocate_self(module_base: *mut u8) {
-    let module: &Module = unsafe { &*Module::get_module_by_module_base(module_base) };
-    let module_runtime = unsafe { module.get_module_runtime() };
+unsafe fn __rtld_relocate_self(module_base: *mut u8) {
+    let module = &mut *Module::get_module_by_module_base(module_base);
+    let module_runtime = module.get_module_runtime();
 
     module_runtime.initialize(module_base, module);
     module_runtime.relocate(false, true);
@@ -152,12 +153,13 @@ unsafe extern "C" fn __rtld_handle_exception(exception_type: u32) {
     }
 }
 
-#[allow(non_snake_case)]
+// TODO: improve safety of this function and make clippy happy
+#[allow(non_snake_case, clippy::not_unsafe_ptr_arg_deref)]
 #[no_mangle]
 pub fn main(module_base: *mut u8, thread_handle: u32) {
     unsafe {
-        let module: &Module = &*Module::get_module_by_module_base(module_base);
-        let module_runtime = module.get_module_runtime();
+        let module = &mut *Module::get_module_by_module_base(module_base);
+        let module_runtime = (module).get_module_runtime();
 
         rtld::initialize(module_runtime);
 
@@ -183,7 +185,7 @@ pub fn main(module_base: *mut u8, thread_handle: u32) {
                 && memory_info.address != linker_module_base
             {
                 let module_base = memory_info.address as *mut u8;
-                let module: &Module = &*Module::get_module_by_module_base(module_base);
+                let module: &mut Module = &mut *Module::get_module_by_module_base(module_base);
 
                 debug_assert!(module.is_valid());
 

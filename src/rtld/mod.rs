@@ -305,14 +305,16 @@ impl Module {
     }
 
     #[inline(always)]
-    pub unsafe fn get_dynamic_table(&self) -> &mut DynamicTableEntry {
-        let module_ptr = self as *const Module as *mut u8;
+    // NOTE: ModuleRuntime is allocated at compile time and is assumed to be always present.
+    pub unsafe fn get_dynamic_table(&mut self) -> &'static mut DynamicTableEntry {
+        let module_ptr = self as *mut Module as *mut u8;
 
         &mut *(module_ptr.add(self.dynamic_offset as usize) as *mut DynamicTableEntry)
     }
 
     #[inline(always)]
-    pub unsafe fn get_module_runtime(&self) -> &mut ModuleRuntime {
+    // NOTE: ModuleRuntime is allocated at compile time and is assumed to be always present.
+    pub unsafe fn get_module_runtime(&mut self) -> &'static mut ModuleRuntime {
         let module_ptr = self as *const Module as *mut u8;
 
         &mut *(module_ptr.add(self.module_runtime_offset as usize) as *mut ModuleRuntime)
@@ -331,10 +333,10 @@ impl Module {
     }
 
     #[inline(always)]
-    pub unsafe fn get_module_by_module_base(module_base: *const u8) -> *const Self {
-        let module_offset = (module_base as *const u32).add(1).read() as usize;
+    pub unsafe fn get_module_by_module_base(module_base: *mut u8) -> *mut Self {
+        let module_offset = (module_base as *mut u32).add(1).read() as usize;
 
-        (module_base).add(module_offset) as *const Self
+        (module_base).add(module_offset) as *mut Self
     }
 }
 
@@ -487,7 +489,7 @@ impl<'a> HashBucketIter<'a> {
             h &= !high;
         }
 
-        return h;
+        h
     }
 
     pub fn new(module_runtime: &'a ModuleRuntime, name: &str) -> Self {
@@ -530,6 +532,7 @@ impl<'a> Iterator for HashBucketIter<'a> {
 }
 
 #[inline]
+#[allow(clippy::empty_loop)]
 fn loop_assert(cond_res: bool) {
     if !cond_res {
         unsafe {
@@ -541,7 +544,7 @@ fn loop_assert(cond_res: bool) {
 }
 
 impl ModuleRuntime {
-    pub fn initialize(&mut self, module_base: *mut u8, module: &Module) {
+    pub fn initialize(&mut self, module_base: *mut u8, module: &mut Module) {
         // Ensure default values
         *self = Self::default();
 
@@ -750,7 +753,7 @@ impl ModuleRuntime {
             }
         }
 
-        return None;
+        None
     }
 
     pub fn get_symbol_by_name(&self, name: &str) -> Option<SymbolTableEntry> {
@@ -782,16 +785,14 @@ impl ModuleRuntime {
         let string_table = unsafe { self.get_string_table() };
 
         if symbol.other.visibility() == SymbolVisibility::Default {
-            for lookup_function in unsafe { LOOKUP_FUNCTIONS } {
-                if let Some(lookup_function) = lookup_function {
-                    let target_address = lookup_function(
-                        self as *const _ as *mut Self,
-                        string_table[symbol.name_offset as usize..].as_ptr(),
-                    );
+            for lookup_function in unsafe { LOOKUP_FUNCTIONS }.into_iter().flatten() {
+                let target_address = lookup_function(
+                    self as *const _ as *mut Self,
+                    string_table[symbol.name_offset as usize..].as_ptr(),
+                );
 
-                    if target_address != 0 {
-                        return Some(target_address);
-                    }
+                if target_address != 0 {
+                    return Some(target_address);
                 }
             }
         } else {
@@ -937,7 +938,7 @@ pub struct ModuleRuntimeIter<'a> {
 impl<'a> ModuleRuntimeIter<'a> {
     pub fn new(root: *mut ModuleRuntimeLink, is_reverse: bool) -> Self {
         ModuleRuntimeIter {
-            root: root,
+            root,
             current: Self::update_next(root, is_reverse),
             is_reverse,
             _phantom: PhantomData::default(),
